@@ -4102,6 +4102,32 @@ static BOOL ios_mode_at_index( UINT index, int *w, int *h )
     return FALSE;
 }
 
+/* Akvavit: colour depths. Every size is listed at 32, 16 and 8 bits per pixel, as on
+ * Windows and in upstream Wine's virtual modes (sysparams.c, depths[] = {8, 16, ...});
+ * this port listed 32 only, and DirectDraw games that need 16 or 8 bits (Railroad
+ * Tycoon II: "Unable to set up video mode") found no usable mode. wined3d reads the
+ * current depth back from ENUM_CURRENT_SETTINGS and builds its screen in it, so a mode
+ * change records the depth it set. */
+static const DWORD ios_mode_depths[] = { 32, 16, 8 };
+static DWORD ios_screen_bpp = 32;
+
+static BOOL ios_mode_depth_ok( DWORD bpp )
+{
+    UINT i;
+    for (i = 0; i < ARRAY_SIZE(ios_mode_depths); i++) if (ios_mode_depths[i] == bpp) return TRUE;
+    return FALSE;
+}
+
+/* Index i is size i / 3 at depth i % 3; index 0 is the current mode, current depth first. */
+static DWORD ios_mode_depth_at_index( DWORD index )
+{
+    DWORD d = ios_mode_depths[index % ARRAY_SIZE(ios_mode_depths)];
+
+    if (index >= ARRAY_SIZE(ios_mode_depths) || ios_screen_bpp == 32) return d;
+    if (d == ios_screen_bpp) return 32;
+    return d == 32 ? ios_screen_bpp : d;
+}
+
 static BOOL ios_virtual_enum_display_settings( DWORD index, DEVMODEW *devmode, DWORD flags )
 {
     int sw, sh;
@@ -4111,7 +4137,7 @@ static BOOL ios_virtual_enum_display_settings( DWORD index, DEVMODEW *devmode, D
     devmode->dmFields = DM_POSITION | DM_DISPLAYORIENTATION | DM_BITSPERPEL |
                         DM_PELSWIDTH | DM_PELSHEIGHT | DM_DISPLAYFLAGS | DM_DISPLAYFREQUENCY;
     devmode->dmDisplayOrientation = DMDO_DEFAULT;
-    devmode->dmBitsPerPel = 32;
+    devmode->dmBitsPerPel = index == ENUM_CURRENT_SETTINGS ? ios_screen_bpp : 32;
     devmode->dmDisplayFrequency = 60;
     devmode->dmDisplayFlags = 0;
     devmode->dmPosition.x = 0;
@@ -4134,7 +4160,8 @@ static BOOL ios_virtual_enum_display_settings( DWORD index, DEVMODEW *devmode, D
     {
         int mw, mh;
 
-        if (!ios_mode_at_index( index, &mw, &mh ))
+        devmode->dmBitsPerPel = ios_mode_depth_at_index( index );
+        if (!ios_mode_at_index( index / ARRAY_SIZE(ios_mode_depths), &mw, &mh ))
         {
             RtlSetLastWin32Error( ERROR_NO_MORE_FILES );
             return FALSE;
@@ -4287,6 +4314,7 @@ static LONG ios_virtual_change_display_settings( UNICODE_STRING *devname, const 
     LONG ret = DISP_CHANGE_SUCCESSFUL;
     const char *why = "no mode requested";
     int sw, sh, want_w = 0, want_h = 0;
+    DWORD want_bpp = ios_screen_bpp;
     BOOL apply = FALSE;
 
     ios_screen_size( &sw, &sh );
@@ -4299,6 +4327,7 @@ static LONG ios_virtual_change_display_settings( UNICODE_STRING *devname, const 
          * session started at. */
         want_w = ios_screen_def_w;
         want_h = ios_screen_def_h;
+        want_bpp = 32;
         apply = !(flags & (CDS_TEST | CDS_NORESET));
         why = "restoring the session default";
     }
@@ -4310,6 +4339,7 @@ static LONG ios_virtual_change_display_settings( UNICODE_STRING *devname, const 
 
         want_w = (int)devmode->dmPelsWidth;
         want_h = (int)devmode->dmPelsHeight;
+        if ((devmode->dmFields & DM_BITSPERPEL) && devmode->dmBitsPerPel) want_bpp = devmode->dmBitsPerPel;
 
         /* the session default is always acceptable */
         if (want_w == ios_screen_def_w && want_h == ios_screen_def_h) found = TRUE;
@@ -4326,6 +4356,7 @@ static LONG ios_virtual_change_display_settings( UNICODE_STRING *devname, const 
         }
 
         if (!found) ret = DISP_CHANGE_BADMODE, why = "mode is not in the virtual mode list";
+        else if (!ios_mode_depth_ok( want_bpp )) ret = DISP_CHANGE_BADMODE, why = "colour depth is not 8, 16 or 32";
         else
         {
             apply = !(flags & (CDS_TEST | CDS_NORESET));
@@ -4333,6 +4364,7 @@ static LONG ios_virtual_change_display_settings( UNICODE_STRING *devname, const 
         }
     }
 
+    if (apply) ios_screen_bpp = want_bpp;
     if (apply && (want_w != sw || want_h != sh))
     {
         if (!ios_virtual_mode_set_enabled()) why = "mode accepted, not programmed (MADEIRA_VIRTUAL_MODE_SET=0)";
@@ -4346,10 +4378,11 @@ static LONG ios_virtual_change_display_settings( UNICODE_STRING *devname, const 
     }
 
     dprintf( STDERR_FILENO,
-             "[iOS ChangeDisplaySettings] virtual display %dx%d: req=%lux%lu flags=%#x -> %d (%s)\n",
+             "[iOS ChangeDisplaySettings] virtual display %dx%d: req=%lux%lu bpp=%lu flags=%#x -> %d (%s)\n",
              sw, sh,
              devmode ? (unsigned long)devmode->dmPelsWidth : 0ul,
              devmode ? (unsigned long)devmode->dmPelsHeight : 0ul,
+             (unsigned long)want_bpp,
              (unsigned)flags, (int)ret, why );
     return ret;
 }
