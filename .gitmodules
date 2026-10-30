@@ -14,3 +14,9 @@
 	path = madeira-dock
 	url = https://github.com/willfaust/madeira-dock.git
 	branch = main
+[submodule "akvavit/vendor/StikJIT"]
+	path = akvavit/vendor/StikJIT
+	url = https://github.com/StikDebug/StikJIT.git
+[submodule "akvavit/vendor/idevice"]
+	path = akvavit/vendor/idevice
+	url = https://github.com/jkcoxson/idevice.git
