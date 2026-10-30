@@ -17,6 +17,7 @@
 #   - commits: those not in Madeira's history (refs/remotes/upstream/*);
 #   - files that Madeira also has: only findings that Madeira's version of the file
 #     (at the merge base) doesn't contain already, binary files included;
+#   - an exact copy of one of Madeira's files under a new name: only the name;
 #   - files that only we have: the whole file.
 # Madeira's own history has its authors' real email addresses, and its project file
 # its team ID; they are Madeira's to publish, not ours.
@@ -132,8 +133,8 @@ load_personal() {
 
 # macOS's bash 3.2 has crashed in fork() after holding whole files in variables, so
 # scan() keeps the text in temporary files that grep reads.
-SCAN_FILE="$(mktemp)" BASE_FILE="$(mktemp)"
-trap 'rm -f "$SCAN_FILE" "$BASE_FILE"' EXIT
+SCAN_FILE="$(mktemp)" BASE_FILE="$(mktemp)" BASE_BLOBS="$(mktemp)" BASE_BLOBS_OF=""
+trap 'rm -f "$SCAN_FILE" "$BASE_FILE" "$BASE_BLOBS"' EXIT
 
 # Scans text on stdin; $1 names where it came from. With $2 = base, a finding is
 # reported only when BASE_FILE (Madeira's version of the same file) doesn't contain it.
@@ -183,11 +184,22 @@ check_ident() {
     printf '%s\n' "$ident" | scan "$who"
 }
 
+# Whether blob $1 is one of Madeira's files at commit $2 (a copy or a renamed file).
+madeira_blob() {
+    if [[ "$BASE_BLOBS_OF" != "$2" ]]; then
+        git ls-tree -r "$2" | awk '{print $3}' | sort -u >"$BASE_BLOBS"
+        BASE_BLOBS_OF="$2"
+    fi
+    grep -qxF -- "$1" "$BASE_BLOBS"
+}
+
 # Scans the new blob $3 of path $2; $1 labels the findings, $4 is the Madeira commit
 # to compare with.
 check_blob() {
     local label="$1" path="$2" sha="$3" base="$4"
-    if git cat-file -e "$base:$path" 2>/dev/null; then
+    if madeira_blob "$sha" "$base"; then
+        check_path "$path"
+    elif git cat-file -e "$base:$path" 2>/dev/null; then
         git cat-file blob "$base:$path" | tr -d '\000' >"$BASE_FILE"
         scan "$label$path" base < <(git cat-file blob "$sha")
     else
