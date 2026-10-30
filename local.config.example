@@ -1,0 +1,16 @@
+# Copy to local.config (git-ignored) and fill in your own values.
+# akvavit/scripts/setup.sh writes the signing values into app/Signing.local.xcconfig,
+# and akvavit/scripts/check-personal.sh refuses any commit that contains them.
+
+# Your Apple developer team ID (Xcode > Settings > Apple Accounts).
+TEAM_ID=XXXXXXXXXX
+
+# The app's bundle identifier. Use a prefix you own.
+BUNDLE_ID=com.example.akvavit
+
+# Your device's UDID, used by scripts that install to the device.
+DEVICE_UDID=
+
+# Words that must never appear in the repository, separated by spaces:
+# your name, username, email address and the like.
+PERSONAL_WORDS=""

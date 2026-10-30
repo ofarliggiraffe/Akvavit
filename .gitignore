@@ -226,3 +226,12 @@ __pycache__/
 
 # Verified runtime component caches
 .runtime-cache/
+
+# Akvavit (akvavit/scripts/check-personal.sh also refuses the personal files)
+# Personal, never committed
+/local.config
+/CLAUDE.local.md
+/app/Signing.local.xcconfig
+.claude/settings.local.json
+# Build state and logs
+/.build/

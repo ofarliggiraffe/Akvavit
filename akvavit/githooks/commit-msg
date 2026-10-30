@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Installed by akvavit/scripts/setup.sh (hooks path akvavit/githooks).
+exec "$(git rev-parse --show-toplevel)/akvavit/scripts/check-personal.sh" --message "$1"

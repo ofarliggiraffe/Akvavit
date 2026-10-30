@@ -1,0 +1,33 @@
+name: Privacy check
+
+# akvavit/scripts/check-personal.sh --everything: every file that differs from
+# Madeira, and every commit and tag of ours on every branch. Madeira's history is
+# fetched so that its commits, which are not ours, can be told apart. A
+# PERSONAL_CONFIG secret (the contents of local.config) would add the personal
+# values; this public repository has none, so the generic checks run. This finds a
+# leak after it has been pushed. The git hooks are what prevent it.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+      - name: Fetch Madeira
+        run: |
+          git fetch --no-tags https://github.com/willfaust/madeira.git \
+            '+refs/heads/*:refs/remotes/upstream/*' \
+            '+refs/tags/*:refs/remotes/upstream/tags/*'
+      - name: Check
+        env:
+          PERSONAL_CONFIG: ${{ secrets.PERSONAL_CONFIG }}
+        run: akvavit/scripts/check-personal.sh --everything

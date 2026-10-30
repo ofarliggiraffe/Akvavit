@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Installed by akvavit/scripts/setup.sh (hooks path akvavit/githooks).
+# Runs Madeira's own pre-push hook (.githooks/pre-push), then checks every commit and
+# annotated tag that this push would publish.
+set -euo pipefail
+root="$(git rev-parse --show-toplevel)"
+"$root/.githooks/pre-push" "$@" </dev/null
+zero=0000000000000000000000000000000000000000
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+    [[ "$local_sha" == "$zero" ]] && continue   # deleting a ref
+    if [[ "$(git cat-file -t "$local_sha")" == tag ]]; then
+        "$root/akvavit/scripts/check-personal.sh" --tag "$local_sha"
+    fi
+    if [[ "$remote_sha" == "$zero" ]]; then
+        range="$local_sha --not --remotes"
+    else
+        range="$remote_sha..$local_sha"
+    fi
+    "$root/akvavit/scripts/check-personal.sh" --commits "$range"
+done
