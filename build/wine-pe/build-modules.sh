@@ -150,6 +150,12 @@ if [ "${UNDELAY:-1}" != 0 ]; then
     for m in "$@"; do
         mk="$R/wine/dlls/$m/Makefile.in"
         [ -f "$mk" ] || continue
+        # Akvavit: never the C runtimes. ucrtbase and msvcrt delay-load advapi32 and
+        # user32; as plain imports those pull in DLLs (msacm32, winmm, ...) whose
+        # DllMain then runs before the C runtime they call is initialized, a null
+        # MSVCRT_locale in msvcrt_get_thread_data. That killed every x64 process
+        # while xtajit64 attached its dependencies (Madeira issue #423).
+        case "$m" in ucrtbase|msvcrt|msvcrt[0-9]*|msvcr[0-9]*|crtdll) continue ;; esac
         delayed="$(sed -n 's/^DELAYIMPORTS[[:space:]]*=[[:space:]]*//p' "$mk")"
         [ -n "$delayed" ] && grep -q '^IMPORTS' "$mk" || continue
         ok=1
