@@ -1,0 +1,10 @@
+// Akvavit: signing, the base configuration of the Xcode project, so every target
+// (the app, the JIT helper, the tunnel) inherits it. Your own values go in
+// Signing.local.xcconfig next to this file (git-ignored), which
+// akvavit/scripts/setup.sh writes from local.config:
+//   DEVELOPMENT_TEAM = <your team ID>
+//   MADEIRA_BUNDLE_IDENTIFIER = <your bundle ID>
+DEVELOPMENT_TEAM =
+MADEIRA_BUNDLE_IDENTIFIER = com.example.akvavit
+
+#include? "Signing.local.xcconfig"

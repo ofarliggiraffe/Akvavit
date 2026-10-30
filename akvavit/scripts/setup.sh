@@ -6,7 +6,9 @@
 #   2. adds Madeira as the remote "upstream", which the privacy check needs to tell
 #      our commits from Madeira's, and fetches it;
 #   3. checks out the submodules at their pinned commits;
-#   4. checks everything of ours for personal information.
+#   4. writes the team ID and bundle ID from local.config into
+#      app/Signing.local.xcconfig (git-ignored), which app/Signing.xcconfig includes;
+#   5. checks everything of ours for personal information.
 #
 # Then run akvavit/scripts/build-native.sh, and build the "Madeira" scheme in Xcode.
 set -euo pipefail
@@ -21,6 +23,8 @@ die() { printf '\nERROR: %s\n' "$*" >&2; exit 1; }
 [[ -f "$ROOT/local.config" ]] || die "Copy local.config.example to local.config and fill it in."
 # shellcheck disable=SC1091
 source "$ROOT/local.config"
+[[ "${TEAM_ID:-}" =~ ^[A-Z0-9]{10}$ ]] || die "local.config: TEAM_ID must be a 10-character Apple team ID."
+[[ "${BUNDLE_ID:-}" =~ ^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$ ]] || die "local.config: BUNDLE_ID is not a bundle identifier."
 
 log "Installing git hooks"
 git -C "$ROOT" config core.hooksPath "$HOOKS"
@@ -47,6 +51,11 @@ git -C "$ROOT" fetch upstream
 
 log "Checking out the submodules at their pinned commits"
 git -C "$ROOT" submodule update --init --recursive
+
+log "Writing app/Signing.local.xcconfig from local.config"
+printf '%s\n' '// Written by akvavit/scripts/setup.sh from local.config. Git-ignored.' \
+    "DEVELOPMENT_TEAM = $TEAM_ID" \
+    "MADEIRA_BUNDLE_IDENTIFIER = $BUNDLE_ID" >"$ROOT/app/Signing.local.xcconfig"
 
 # Only needed for committing, so a build-only setup doesn't need PERSONAL_WORDS.
 if [[ -n "${PERSONAL_WORDS:-}" ]]; then
