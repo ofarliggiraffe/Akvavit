@@ -30,7 +30,7 @@ struct MadeiraApp: App {
         WindowGroup {
             ContentView()
                 .background(InteractionFrameRateInstaller())   // touch frame-rate request (New library grid)
-                .modifier(ClaimGamepadEvents())
+                .background(AkvavitGamepadClaim())   // Akvavit: on the window; see AkvavitGamepadClaim.swift
                 .onAppear {
                     ExternalDrives.shared.mountAll()
                     GamepadInput.shared.start()

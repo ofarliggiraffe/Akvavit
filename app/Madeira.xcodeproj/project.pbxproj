@@ -183,6 +183,13 @@
 		A1000245 /* TouchGamepad.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000245 /* TouchGamepad.swift */; };
 		A1000F01 /* GestureZones.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000F01 /* GestureZones.swift */; };
 		A1000246 /* TouchControlPresets.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000246 /* TouchControlPresets.swift */; };
+		97DC6B4AA8B35A6A71897A0F /* AkvavitGamepadClaim.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBA5CAE4688C63A38856947A /* AkvavitGamepadClaim.swift */; };
+		EE9B425DFE6AF7A925FE3581 /* AkvavitJITSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00883D5CA4F6DDF398324342 /* AkvavitJITSettings.swift */; };
+		83BDF59E637A23F05ACE0B4B /* AkvavitSetup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0711C36EDFF27FC208ADCE8B /* AkvavitSetup.swift */; };
+		87508E203E1101C960173614 /* AkvavitSteamPoll.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DBAED012AEA25FFDEC1AB40 /* AkvavitSteamPoll.swift */; };
+		266DC10CC4C95AF77338064C /* AkvavitTunnel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 880F1CFCC175B3CB4D053CAB /* AkvavitTunnel.swift */; };
+		59BCCC8A03724766F5DAB967 /* PacketTunnelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BDFC7D58F975AC4E6A8EA26 /* PacketTunnelProvider.swift */; };
+		AE3874E49C604B9716BB2D6E /* AkvavitTunnel.appex in Embed */ = {isa = PBXBuildFile; fileRef = 658946959BE7187C94B0CB3E /* AkvavitTunnel.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -192,6 +199,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = B5000001;
 			remoteInfo = MadeiraJITHelper;
+		};
+		086CE2DCE1B6374C9E447FB3 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A6000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 40C26B9A36D6D12BD155E228;
+			remoteInfo = AkvavitTunnel;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -212,6 +226,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
+				AE3874E49C604B9716BB2D6E /* AkvavitTunnel.appex in Embed */,
 				B1000016 /* MadeiraJITHelper.appex in Embed JIT Helper */,
 			);
 			name = "Embed JIT Helper";
@@ -413,6 +428,15 @@
 		A2000245 /* TouchGamepad.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TouchGamepad.swift; sourceTree = "<group>"; };
 		A2000F01 /* GestureZones.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GestureZones.swift; sourceTree = "<group>"; };
 		A2000246 /* TouchControlPresets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TouchControlPresets.swift; sourceTree = "<group>"; };
+		FBA5CAE4688C63A38856947A /* AkvavitGamepadClaim.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "AkvavitGamepadClaim.swift"; path = "../akvavit/App/AkvavitGamepadClaim.swift"; sourceTree = SOURCE_ROOT; };
+		00883D5CA4F6DDF398324342 /* AkvavitJITSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "AkvavitJITSettings.swift"; path = "../akvavit/App/AkvavitJITSettings.swift"; sourceTree = SOURCE_ROOT; };
+		0711C36EDFF27FC208ADCE8B /* AkvavitSetup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "AkvavitSetup.swift"; path = "../akvavit/App/AkvavitSetup.swift"; sourceTree = SOURCE_ROOT; };
+		7DBAED012AEA25FFDEC1AB40 /* AkvavitSteamPoll.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "AkvavitSteamPoll.swift"; path = "../akvavit/App/AkvavitSteamPoll.swift"; sourceTree = SOURCE_ROOT; };
+		880F1CFCC175B3CB4D053CAB /* AkvavitTunnel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "AkvavitTunnel.swift"; path = "../akvavit/App/AkvavitTunnel.swift"; sourceTree = SOURCE_ROOT; };
+		7BDFC7D58F975AC4E6A8EA26 /* PacketTunnelProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "PacketTunnelProvider.swift"; path = "../akvavit/Tunnel/PacketTunnelProvider.swift"; sourceTree = SOURCE_ROOT; };
+		404E2964D0E033ED1D0ECF1B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "Info.plist"; path = "../akvavit/Tunnel/Info.plist"; sourceTree = SOURCE_ROOT; };
+		3E604B5DEA0047FD73F5C43A /* AkvavitTunnel.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = "AkvavitTunnel.entitlements"; path = "../akvavit/Tunnel/AkvavitTunnel.entitlements"; sourceTree = SOURCE_ROOT; };
+		658946959BE7187C94B0CB3E /* AkvavitTunnel.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = AkvavitTunnel.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -467,12 +491,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		0CFDDF22806046DA3D72B0DC /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		A4000001 = {
 			isa = PBXGroup;
 			children = (
+				7115A7D2CFB920A7816DDCA2 /* Akvavit */,
 				A4000002 /* Madeira */,
 				B4000001 /* MadeiraJITHelper */,
 				A4000004 /* Libraries */,
@@ -642,6 +674,7 @@
 		A4000003 /* Products */ = {
 			isa = PBXGroup;
 			children = (
+				658946959BE7187C94B0CB3E /* AkvavitTunnel.appex */,
 				A2000009 /* Madeira.app */,
 				B2000022 /* MadeiraJITHelper.appex */,
 			);
@@ -701,6 +734,21 @@
 			path = MadeiraJITHelper;
 			sourceTree = "<group>";
 		};
+		7115A7D2CFB920A7816DDCA2 /* Akvavit */ = {
+			isa = PBXGroup;
+			children = (
+				3E604B5DEA0047FD73F5C43A /* AkvavitTunnel.entitlements */,
+				404E2964D0E033ED1D0ECF1B /* Info.plist */,
+				7BDFC7D58F975AC4E6A8EA26 /* PacketTunnelProvider.swift */,
+				880F1CFCC175B3CB4D053CAB /* AkvavitTunnel.swift */,
+				7DBAED012AEA25FFDEC1AB40 /* AkvavitSteamPoll.swift */,
+				0711C36EDFF27FC208ADCE8B /* AkvavitSetup.swift */,
+				00883D5CA4F6DDF398324342 /* AkvavitJITSettings.swift */,
+				FBA5CAE4688C63A38856947A /* AkvavitGamepadClaim.swift */,
+			);
+			name = Akvavit;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -719,6 +767,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				34790FAC323CFABEAAE45E33 /* PBXTargetDependency */,
 				B3000006 /* PBXTargetDependency */,
 			);
 			name = Madeira;
@@ -741,6 +790,22 @@
 			name = MadeiraJITHelper;
 			productName = MadeiraJITHelper;
 			productReference = B2000022 /* MadeiraJITHelper.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		40C26B9A36D6D12BD155E228 /* AkvavitTunnel */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 24CB1A24DC2A5C5EEF74DC46;
+			buildPhases = (
+				A0101A8EF28BD7EC1841A4BB /* Sources */,
+				0CFDDF22806046DA3D72B0DC /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = AkvavitTunnel;
+			productName = AkvavitTunnel;
+			productReference = 658946959BE7187C94B0CB3E /* AkvavitTunnel.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
@@ -776,6 +841,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
+				40C26B9A36D6D12BD155E228 /* AkvavitTunnel */,
 				A5000001 /* Madeira */,
 				B5000001 /* MadeiraJITHelper */,
 			);
@@ -862,6 +928,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				266DC10CC4C95AF77338064C /* AkvavitTunnel.swift in Sources */,
+				87508E203E1101C960173614 /* AkvavitSteamPoll.swift in Sources */,
+				83BDF59E637A23F05ACE0B4B /* AkvavitSetup.swift in Sources */,
+				EE9B425DFE6AF7A925FE3581 /* AkvavitJITSettings.swift in Sources */,
+				97DC6B4AA8B35A6A71897A0F /* AkvavitGamepadClaim.swift in Sources */,
 				A1000520 /* MadeiraDock.swift in Sources */,
 				A1000521 /* MadeiraDockView.swift in Sources */,
 				A1000650 /* DockStartScreen.swift in Sources */,
@@ -993,6 +1064,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A0101A8EF28BD7EC1841A4BB /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				59BCCC8A03724766F5DAB967 /* PacketTunnelProvider.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -1000,6 +1079,11 @@
 			isa = PBXTargetDependency;
 			target = B5000001 /* MadeiraJITHelper */;
 			targetProxy = B3000001 /* PBXContainerItemProxy */;
+		};
+		34790FAC323CFABEAAE45E33 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 40C26B9A36D6D12BD155E228 /* AkvavitTunnel */;
+			targetProxy = 086CE2DCE1B6374C9E447FB3 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -1230,6 +1314,60 @@
 			};
 			name = Release;
 		};
+		8251A768A639D135D3674CEC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = "YES";
+				CODE_SIGN_ENTITLEMENTS = "../akvavit/Tunnel/AkvavitTunnel.entitlements";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = "Automatic";
+				CURRENT_PROJECT_VERSION = "4";
+				GENERATE_INFOPLIST_FILE = "NO";
+				INFOPLIST_FILE = "../akvavit/Tunnel/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = "17.0";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "0.1.3";
+				PRODUCT_BUNDLE_IDENTIFIER = "$(MADEIRA_BUNDLE_IDENTIFIER).Tunnel";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = "YES";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = "NO";
+				SWIFT_VERSION = "5.0";
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		3A7DF7CB59399D77231CEC33 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = "YES";
+				CODE_SIGN_ENTITLEMENTS = "../akvavit/Tunnel/AkvavitTunnel.entitlements";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = "Automatic";
+				CURRENT_PROJECT_VERSION = "4";
+				GENERATE_INFOPLIST_FILE = "NO";
+				INFOPLIST_FILE = "../akvavit/Tunnel/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = "17.0";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = "0.1.3";
+				PRODUCT_BUNDLE_IDENTIFIER = "$(MADEIRA_BUNDLE_IDENTIFIER).Tunnel";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = "YES";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = "NO";
+				SWIFT_VERSION = "5.0";
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1256,6 +1394,15 @@
 			buildConfigurations = (
 				B8000001 /* Debug */,
 				B8000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		24CB1A24DC2A5C5EEF74DC46 /* Build configuration list for PBXNativeTarget "AkvavitTunnel" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8251A768A639D135D3674CEC /* Debug */,
+				3A7DF7CB59399D77231CEC33 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

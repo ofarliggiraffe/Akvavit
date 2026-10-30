@@ -147,7 +147,7 @@ enum OnboardingRules {
     private func open(reason: String, since: Int) {
         // Never over a running session.
         guard available, LibraryModel.shared.current == nil, wine_process_is_running() == 0 else { return }
-        offerLocalDevVPN = !LocalDevVPN.isInstalled
+        offerLocalDevVPN = !AkvavitTunnel.shared.handlesJIT && !LocalDevVPN.isInstalled
         offerWineMono = !WineMonoModel.available
         self.since = since
         LogStore.shared.log("[onboarding] shown reason=\(reason) steps=\(steps.map(\.rawValue).joined(separator: ","))")

@@ -238,6 +238,8 @@ enum JITShortcutFile {
     /// Runs "start". Pending from before it runs: even a "start" that fails part-way may
     /// have changed something.
     func start(completion: @escaping (Outcome) -> Void) {
+        // Akvavit: its own loopback tunnel replaces LocalDevVPN and the shortcut.
+        if AkvavitTunnel.shared.handlesJIT { AkvavitTunnel.shared.start(completion: completion); return }
         let cellular = cellularOnly
         let base = cellular ? "done cellular" : "done"
         // LocalDevVPN already connected (its tunnel just does not work over cellular
@@ -255,6 +257,7 @@ enum JITShortcutFile {
 
     /// Runs "done" when "start" ran since the last "done", then calls `completion`.
     func restoreIfNeeded(completion: @escaping () -> Void) {
+        if AkvavitTunnel.shared.handlesJIT { AkvavitTunnel.shared.stop(); completion(); return }
         guard let input = pending else { completion(); return }
         pending = nil
         run(input) { _ in completion() }
@@ -263,6 +266,7 @@ enum JITShortcutFile {
     /// At launch: a run that ended between "start" and "done" left the device without
     /// cellular data or its VPN; put them back.
     func restoreLeftover() {
+        if AkvavitTunnel.shared.handlesJIT { AkvavitTunnel.shared.settleAtLaunch(); return }
         guard pending != nil, enabled else { return }
         LogStore.shared.log("[jit-shortcut] an earlier run ended before done: restoring now")
         restoreIfNeeded {}

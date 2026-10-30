@@ -2398,6 +2398,8 @@ struct ContentView: View {
     }
 
     private func enableJIT() {
+        // Akvavit: one attempt at a time. A Play that waits is started by the running one.
+        guard jitStatus != .testing else { logStore.log("[jit] already enabling: request ignored"); return }
         // Explains why JIT cannot be enabled on a copy signed without get-task-allow; 0 opens StikDebug regardless.
         // A debugger can attach only to a process whose signature carries
         // get-task-allow (a development signature). A copy signed with a

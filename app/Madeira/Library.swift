@@ -2933,7 +2933,7 @@ struct LibraryView: View {
         } message: { Text(model.error ?? "") }
         // Signing that runs out: the refresh, and the offer when it could not run (SigningRefresh.swift).
         .modifier(SigningRefreshOffer())
-        .fullScreenCover(isPresented: $onboarding.presented) { OnboardingView() }
+        .fullScreenCover(isPresented: $onboarding.presented) { AkvavitSetupView() }
         .onAppear {
             // An ended desktop session's surface never stays over the library.
             EndedSessionSurface.install(); EndedSessionSurface.hide(reason: "library-appeared")
@@ -3022,7 +3022,7 @@ struct LibraryView: View {
                 Section { LibraryStatus().listRowBackground(Color.clear) }
             }
             if settingsShow("JIT", "StikDebug", "built-in", "pairing", "LocalDevVPN") {
-                JITSettingsSection()
+                if AkvavitTunnel.enabled { AkvavitJITSettingsSection() } else { JITSettingsSection() }
             }
             if settingsShow("signing", "expires", "refresh", "Apple", "sign-in", "7 days") { SigningSettingsSection() }
             if settingsShow("diagnostics", "extended logging", "logging", "log") {

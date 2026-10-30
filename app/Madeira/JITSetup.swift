@@ -168,8 +168,10 @@ final class JITCoordinator: ObservableObject {
         var message: String {
             switch self {
             case .vpn:
+                if AkvavitTunnel.enabled { return AkvavitTunnel.unreachableMessage }
                 return "Madeira couldn't reach this device. Connect LocalDevVPN, then try again."
             case .pairing:
+                if AkvavitTunnel.enabled { return "This iPhone closed the connection, which usually means it no longer accepts the pairing. Pair again." }
                 return "This device closed the connection, which usually means it no longer accepts Madeira's pairing. Pair again, and check that LocalDevVPN is connected."
             }
         }
@@ -258,16 +260,18 @@ final class JITCoordinator: ObservableObject {
                                        probe.reachable ? "reachable" : "unreachable", probe.milliseconds,
                                        vpnWasUp ? 1 : 0, probe.detail))
             self?.loopbackAnswered = probe.reachable
-            guard let self, !probe.reachable, JITNetworkShortcut.shared.enabled else { proceed(false); return }
-            status = "Running the \(JITNetworkShortcut.name) shortcut…"
+            let tunnel = AkvavitTunnel.shared.handlesJIT
+            guard let self, !probe.reachable, JITNetworkShortcut.shared.enabled || tunnel else { proceed(false); return }
+            status = tunnel ? "Starting Akvavit's VPN…" : "Running the \(JITNetworkShortcut.name) shortcut…"
             JITNetworkShortcut.shared.start { [weak self] outcome in
                 if case .failed(let why) = outcome {
-                    stopped("Your \(JITNetworkShortcut.name) shortcut stopped: \(why) Check its steps in Shortcuts, then try again.")
+                    stopped(tunnel ? why
+                                   : "Your \(JITNetworkShortcut.name) shortcut stopped: \(why) Check its steps in Shortcuts, then try again.")
                     return
                 }
                 // LocalDevVPN's Connect returns before its tunnel routes (about 5 s
                 // on the 18 Pro): go on the moment lockdownd answers.
-                self?.status = "Waiting for LocalDevVPN…"
+                self?.status = tunnel ? "Waiting for the VPN…" : "Waiting for LocalDevVPN…"
                 let waitStart = CFAbsoluteTimeGetCurrent()
                 LoopbackProbe.waitUntilReachable(within: 15) { [weak self] probe in
                     LogStore.shared.log(String(format: "[jit-loopback] after the shortcut: %@ after %.1f s (vpn-interface=%d, %@)",
@@ -378,8 +382,22 @@ final class JITCoordinator: ObservableObject {
         busy = true
         error = nil
         connectionProblem = nil
-        status = "Checking LocalDevVPN and the Developer Disk Image…"
+        guard AkvavitTunnel.shared.handlesJIT else { sendPrepare(pairing); return }
+        // Akvavit: the check needs the loopback too, so start the tunnel around it.
+        status = "Checking the VPN and the Developer Disk Image…"
+        ensureLoopback(then: { [weak self] _ in self?.sendPrepare(pairing) },
+                       stopped: { [weak self] message in
+            self?.busy = false
+            self?.status = nil
+            self?.error = message
+            JITNetworkShortcut.shared.restoreIfNeeded {}
+        })
+    }
+
+    private func sendPrepare(_ pairing: Data) {
+        if !AkvavitTunnel.shared.handlesJIT { status = "Checking LocalDevVPN and the Developer Disk Image…" }
         MadeiraBuiltInJIT.send(.prepare(pairingData: pairing)) { [weak self] result in
+            if AkvavitTunnel.shared.handlesJIT { JITNetworkShortcut.shared.restoreIfNeeded {} }
             guard let self else { return }
             busy = false
             switch result {
@@ -522,7 +540,10 @@ enum LocalDevVPN {
                 JITCoordinator.shared.showSetup = true
             }
         }
-        if JITNetworkShortcut.shared.enabled {
+        if AkvavitTunnel.enabled {
+            // Akvavit: its own VPN starts with every attempt; nothing to install or connect.
+            if let retry { Button("Try Again") { dismiss(); retry() } }
+        } else if JITNetworkShortcut.shared.enabled {
             Button("Connect with \(JITNetworkShortcut.name)") {
                 dismiss()
                 if let retry { retry() } else { JITCoordinator.shared.connectWithShortcut() }
