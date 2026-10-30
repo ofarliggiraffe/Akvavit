@@ -115,7 +115,13 @@ class SteamCredentialAuth {
             pollRequest.clientID = clientID
             pollRequest.requestID = requestIDData
 
-            let responseData = try await SteamAuthAPI.call("PollAuthSessionStatus", body: pollRequest.serialize())
+            let responseData: Data
+            do {
+                responseData = try await SteamAuthAPI.call("PollAuthSessionStatus", body: pollRequest.serialize())
+            } catch where AkvavitSteamPoll.isTransient(error) {   // Akvavit: see AkvavitSteamPoll.swift
+                try await AkvavitSteamPoll.pause(after: error, seconds: pollInterval)
+                continue
+            }
             let pollResponse = try CAuthentication_PollAuthSessionStatus_Response.deserialize(from: responseData)
 
             if pollResponse.newClientID != 0 {

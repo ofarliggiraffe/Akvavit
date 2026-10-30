@@ -80,7 +80,13 @@ class SteamQRAuth {
             pollRequest.clientID = clientID
             pollRequest.requestID = requestIDData
 
-            let responseData = try await callSteamAuthAPI(method: "PollAuthSessionStatus", body: pollRequest.serialize())
+            let responseData: Data
+            do {
+                responseData = try await callSteamAuthAPI(method: "PollAuthSessionStatus", body: pollRequest.serialize())
+            } catch where AkvavitSteamPoll.isTransient(error) {   // Akvavit: see AkvavitSteamPoll.swift
+                try await AkvavitSteamPoll.pause(after: error, seconds: pollInterval)
+                continue
+            }
             let pollResponse = try CAuthentication_PollAuthSessionStatus_Response.deserialize(from: responseData)
 
             // Update client ID if it changed (Steam may rotate it)
