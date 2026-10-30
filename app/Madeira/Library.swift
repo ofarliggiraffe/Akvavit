@@ -192,7 +192,10 @@ struct LibraryEntry: Codable, Identifiable {
     var fpsMode = 1
     /// FEX's X87ReducedPrecision for this game. Export both states explicitly:
     /// FEX defaults to reduced precision when no override is set.
-    var reducedX87 = false
+    /// Akvavit: nil = on for 32-bit programs (Wine's i386 d3d8/wined3d do their
+    /// math in x87; Railroad Tycoon 3 ran at 7 FPS with it off, 60 with it on).
+    var reducedX87: Bool?
+    var effectiveReducedX87: Bool { reducedX87 ?? (bits == 32) }
     var liveLogs = false
     var performance = false
     var touchControls = false
@@ -546,7 +549,7 @@ struct LibraryEntry: Codable, Identifiable {
         configureLaunch()
         // MADEIRA_ARGS now holds an Epic game's sign-in code; nothing else needs it.
         Self.setTransientArguments(nil, for: id)
-        setenv("FEX_X87REDUCEDPRECISION", reducedX87 ? "1" : "0", 1)
+        setenv("FEX_X87REDUCEDPRECISION", effectiveReducedX87 ? "1" : "0", 1)
         // Exported only when chosen: unset keeps the engine's own default (and any
         // madeira.cfg setting), as before these choices existed.
         // Unset otherwise, so a previous game's choice (a launch that died before the
@@ -3700,7 +3703,9 @@ struct LibraryDetail: View {
 
     @ViewBuilder private var compatibilityPage: some View {
         Section {
-            Toggle(isOn: $entry.reducedX87) { compatLabel("Reduced-precision x87", "Faster, less accurate") }
+            Toggle(isOn: Binding(get: { entry.effectiveReducedX87 }, set: { entry.reducedX87 = $0 })) {
+                compatLabel("Reduced-precision x87", "Faster, less accurate")
+            }
             Toggle(isOn: Binding(get: { entry.largeReservations ?? false }, set: { entry.largeReservations = $0 ? true : nil })) {
                 compatLabel("Large memory reservations", "For requests of 64 GB or more. Backs up to 16 GB by default.")
             }

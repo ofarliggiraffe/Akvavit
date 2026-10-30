@@ -16810,7 +16810,14 @@ static int ios_guest_image_is_host_data( const void *base, size_t size )
 
     if (!ios_guest_image_write_enabled()) return 0;
     if (!ios_wow_in_window( base )) return 0;
-    if (!(view = find_view( base, size ))) return 0;
+    /* Akvavit: the range is host-page rounded (16 KB), and an image's SizeOfImage is
+     * only 4 KB aligned, so a range covering its last page ends past the view
+     * (Railroad Tycoon 3: 0x9cd000 -> 0x9d0000). find_view( base, size ) refused
+     * that, and the whole image went to the JIT pool, with every store emulated. */
+    if (!(view = find_view( base, 1 ))) return 0;
+    if ((const char *)base + size >
+        (const char *)ROUND_ADDR( (const char *)view->base + view->size + host_page_mask, host_page_mask ))
+        return 0;
     return (view->protect & SEC_IMAGE) != 0;
 #else
     return 0;
