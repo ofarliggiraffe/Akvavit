@@ -1,185 +1,163 @@
-<p align="center">
-  <img src="docs/assets/banner.png" alt="Madeira — Bringing PC gaming to your iPhone." width="100%">
-</p>
+# Akvavit
 
-<p align="center">
-  <a href="https://discord.gg/4t5mNjwCn7"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fdiscord.com%2Fapi%2Finvites%2F4t5mNjwCn7%3Fwith_counts%3Dtrue&query=%24.approximate_member_count&suffix=%20members&label=Discord&logo=discord&logoColor=white&color=5865F2&style=for-the-badge" alt="Join the Madeira Discord"></a>
-  &nbsp;&nbsp;&nbsp;
-  <a href="https://github.com/willfaust/Madeira/releases"><img src="https://img.shields.io/github/v/release/willfaust/Madeira?label=Release&style=for-the-badge&color=brightgreen" alt="Latest release"></a>
-  &nbsp;&nbsp;&nbsp;
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0--or--later-yellow?style=for-the-badge" alt="License: GPL-3.0-or-later"></a>
-</p>
+**This is [Madeira](https://github.com/willfaust/Madeira), by Will Faust and its
+contributors.** Madeira runs Windows PC games on a non-jailbroken iPhone, with
+FEX-Emu, Wine and DXMT. All of that work is theirs. Akvavit is a fork that
+packages Madeira for building and installing on your own iPhone, with a few
+fixes on top. The first target is Railroad Tycoon 3 on an iPhone Duo.
 
-Madeira runs Windows PC games on an iPhone, with no jailbreak. Games run as they
-are, unmodified, inside a single iOS app.
+Madeira's own README, which explains how it works, is in [MADEIRA.md](MADEIRA.md).
 
 > [!NOTE]
-> Madeira is an active research project. Many games start and some play well,
-> but performance and compatibility vary from game to game, and things change
-> quickly. Expect rough edges.
+> This is a personal project in an early state, built on a research project.
+> Expect rough edges. The changes are tested on one device.
 
-## How it works
+## What Akvavit changes
 
-| Layer | What it does |
-|---|---|
-| **[FEX-Emu](https://github.com/FEX-Emu/FEX)** | Translates the game's x86 and x86-64 code to ARM64 as it runs. |
-| **[Wine](https://www.winehq.org/)** 11.4 | Provides Windows. It is built for ARM64EC, so Wine itself runs natively and only the game's own code is translated. 32-bit games run through WoW64. |
-| **[DXMT](https://github.com/3Shain/DXMT)** | Draws Direct3D 9, 10 and 11 with Metal. |
-| **[madeira-d3d12](madeira-d3d12)** | Madeira's own Direct3D 12 implementation on Metal, converting DXIL shaders at run time with Apple's Metal Shader Converter. |
+- Builds and signs the app with your own developer account and bundle ID, and
+  names it Akvavit.
+- Works around build problems on a current Mac (Python version for Mesa,
+  Homebrew's Rust).
+- **JIT without other apps:** a loopback VPN built into the app
+  (`akvavit/Tunnel`) replaces LocalDevVPN and the JIT shortcut. Pair the
+  iPhone once in setup (Madeira's own in-app pairing, iOS 27), allow the VPN
+  once, and Enable JIT works by itself. The VPN only carries traffic to the
+  iPhone itself. It stays on by default (Settings › JIT), so JIT also works
+  offline. The one rule: JIT can't start while the iPhone uses cellular data,
+  so use Wi-Fi, or turn on airplane mode for a moment.
+- **StikJIT built from source** (`akvavit/scripts/build-stikjit.sh`):
+  StikJIT 1.9.0 and the idevice library inside it (v0.1.68), pinned as
+  submodules in `akvavit/vendor`, replace the prebuilt framework Madeira
+  ships. The build checks that the result has the same public interface as
+  the prebuilt one, and lists the licences of every Rust crate inside it in
+  the app's `legal` folder.
+- **32-bit OpenGL in Madeira's Wine:** 32-bit programs keep their memory in a
+  separate window on iOS, and Wine's generated OpenGL bridge for them didn't
+  translate their pointers, so Direct3D 8 games (through wined3d) crashed
+  while loading. The generator now emits Madeira's own translation, also for
+  OpenGL context handles and function names. The `wine` submodule points to
+  [Akvavit's Wine](https://github.com/ofarliggiraffe/wine/tree/akvavit) for
+  this.
+- **32-bit games at full speed:**
+  - A program image whose size isn't a multiple of iOS's 16 KB pages no longer
+    ends up in the JIT memory pool, where every write to it was emulated.
+  - "Reduced-precision x87" is on by default for 32-bit games, and can still
+    be switched off per game.
 
-iOS apps cannot start other programs, so everything runs in one process: even
-Wine's server runs as a thread instead of a separate program.
+  Railroad Tycoon 3 went from 1–2 to 60 FPS.
+- **16- and 8-bit colour modes** for old DirectDraw games, as on Windows.
+  Railroad Tycoon II needs them to start.
+- **64-bit programs work in a local build** (Madeira issue #423): the C
+  runtimes keep their delay imports.
+- **Steam sign-in** survives approving it in the Steam app.
+- **Its own setup screens** for JIT, which leave Madeira's Steam, Dock and
+  Wine Mono pages as they are.
+- **iPhone Duo:** the library's toolbar and tab bar can be tapped on the
+  outer display (Madeira's gamepad handling made them untappable there).
 
-## Features
+Akvavit's own code lives in `akvavit/`. Changes to Madeira's files are kept
+small, so updates from Madeira merge easily.
 
-- **Game library** with artwork, search and a Windows desktop session.
-- **Steam**: sign in, browse the games you own, install and update them, and
-  start them through Valve's own Windows Steam client (Madeira Dock).
-- **Steam Cloud saves**: saves sync with Steam Cloud when Madeira starts and
-  before a game starts, and **Upload saves and close Madeira** in the game
-  menu sends them when you stop playing. Saves that
-  changed on both sides are never overwritten without asking, and anything a
-  sync replaces is backed up.
-- **Controllers**: Bluetooth controllers through XInput, plus customisable
-  on-screen touch controls.
-- **Keyboard, mouse and trackpad** passed through to games as real input.
-- **Video and audio** for cutscenes and music, through FFmpeg, VideoToolbox and AudioToolbox.
+Planned:
+
+- **Older Direct3D and DirectDraw:** open-source wrappers such as d3d8to9 and
+  cnc-ddraw, built from source, bundled and applied per game automatically.
+- **Foldable support** for the iPhone Duo: resize when folding and unfolding,
+  and moving between the two displays.
 
 ## Requirements
 
-- An iPhone on **iOS 26 or later**, the only version Madeira currently runs
-  on reliably. Development happens on recent Pro iPhones.
-- **JIT**, which iOS only allows while a debugger is attached. Madeira can use
-  [StikDebug](https://github.com/StikDebug/StikDebug) or its built-in StikJIT
-  helper. On iOS 27 the built-in helper can pair the iPhone itself, without a
-  computer.
-- An **Apple ID** to sideload the app. A free account works; its signing
-  expires after 7 days, so the app needs refreshing weekly. Madeira
-  [refreshes itself](docs/JIT.md#refreshing-the-signing): installed with
-  SideInstaller it needs nothing more, otherwise sign in under Settings → Signing.
-  Your games and saves are kept across reinstalls.
+- macOS with Xcode 27.1 or later (iOS 27.1 SDK), Homebrew, Git, Python 3.10 or
+  later from Homebrew, and Rust (`brew install rustup && rustup default stable`).
+  The build installs XcodeGen with Homebrew if it's missing.
+- A **paid** Apple developer account. The app needs the Increased Memory Limit
+  and Extended Virtual Addressing capabilities, and the built-in VPN needs
+  Network Extensions.
+- About 40 GB of free disk space for the checkout and the build.
+- An iPhone on iOS 26 or later; see [MADEIRA.md](MADEIRA.md) for JIT
+  requirements.
 
-Because JIT needs a debugger, Madeira cannot be offered on the App Store.
-
-## Installing
-
-1. Download the IPA from the [latest release](https://github.com/willfaust/Madeira/releases).
-2. Sideload it with your own Apple ID using SideStore, AltStore, Sideloadly,
-   Plume or a similar tool.
-3. Open Madeira and enable JIT. Automatic mode uses StikDebug when installed,
-   otherwise it guides you through the built-in setup; see
-   [JIT setup](docs/JIT.md).
-4. In **Settings**, check that **JIT** and **Memory+** both show a green check:
-   Madeira then says **Ready to play**.
-
-Some 64-bit games need Microsoft's Visual C++ runtime, which is not included
-(see [Licensing](#licensing)).
-
-## Building from source
+## Building
 
 ```sh
-git clone --recurse-submodules https://github.com/willfaust/Madeira.git
+git clone --recurse-submodules https://github.com/ofarliggiraffe/Akvavit.git
+cd Akvavit
+cp local.config.example local.config   # then fill in your team ID and bundle ID
+akvavit/scripts/setup.sh               # hooks, submodules, signing settings
+akvavit/scripts/build-native.sh        # about an hour the first time
 ```
 
-`FEX`, `wine`, `dxmt` and `madeira-dock` are submodules that point at Madeira's
-own forks; upstream checkouts will not build here. The build has several parts
-(the Wine unix libraries, the ARM64EC Windows modules, FEX, DXMT and the app)
-and some inputs that are not in the repository, such as the toolchains.
-[`docs/BUILDING.md`](docs/BUILDING.md) walks through all of it.
-git clone --recurse-submodules <this repo>
-cd Madeira
-./tools/build-ipa.sh   # produces dist/Madeira.ipa
+Then open `app/Madeira.xcodeproj` in Xcode, choose the **Madeira** scheme and
+your device, and build. Use the Debug configuration: Madeira's docs say Release
+builds have crashed games.
+
+Don't use the app's Settings › Signing to re-sign it. It sends your Apple ID
+through third-party servers. A build from Xcode with a paid account is valid
+for a year.
+
+## Updating from Madeira
+
+```sh
+git fetch upstream
+git merge upstream/main
 ```
 
-See [`BUILDING.md`](BUILDING.md) for prerequisites, timing, and re-run notes.
+If Madeira moved its `wine` submodule, merge Madeira's Wine branch
+(`madeira-lgpl` of `willfaust/wine`) into Akvavit's `akvavit` branch in
+`wine/`. If `dlls/opengl32/unix_thunks.c` conflicts there, take Madeira's
+version and run `akvavit/scripts/regen-opengl-thunks.sh`. Then commit the new
+`wine` pointer here, and rebuild.
 
-Note that `FEX`, `wine` and `research/dxmt` are submodules pointing at forks
-containing the iOS work; upstream clones will not build here.
+## Keeping personal information out
 
-### Repository layout
+`local.config` holds your team ID, bundle ID, device UDID and any words that
+must never be published. It is git-ignored, and so is
+`app/Signing.local.xcconfig`, which `setup.sh` writes from it.
+`akvavit/scripts/setup.sh` installs git hooks (`akvavit/githooks`) that run
+`akvavit/scripts/check-personal.sh` on every commit, commit message, merge and
+push (tags included), with fallback copies in `.git/hooks` in case
+`core.hooksPath` is ever unset. The pre-push hook also runs Madeira's own.
 
-| Path | Contents |
-|---|---|
-| [`app/`](app) | The iOS app: SwiftUI front end, Wine bridge and bundled resources |
-| [`wine/`](https://github.com/willfaust/wine), [`FEX/`](https://github.com/willfaust/FEX), [`dxmt/`](https://github.com/willfaust/dxmt), [`madeira-dock/`](https://github.com/willfaust/madeira-dock) | Madeira's forks and the Steam client launcher (submodules) |
-| [`madeira-d3d12/`](madeira-d3d12) | The native Direct3D 12 runtime |
-| [`build/`](build) | Build scripts and iOS-side sources, one folder per component |
-| [`tests/`](tests) | Host checks and x86, x86-64 and DXMT test programs |
-| [`tools/`](tools) | Helper scripts |
-| [`docs/`](docs) | Documentation |
-| [`research/`](research) | Experiments that are not part of the app |
+The check covers what Akvavit adds on top of Madeira: commits that aren't in
+Madeira's history, files that only Akvavit has (whole, binary ones too), and
+in Madeira's files only what Madeira's version doesn't already contain. It
+refuses:
 
-## Documentation
+- the values in `local.config`, which it requires
+- device UDIDs, home directory paths (macOS, Linux, Wine), email addresses
+  other than noreply ones, Xcode team IDs, device and host names that start
+  with someone's name, private keys and access tokens
+- files that never belong in the repository: signing material, crash logs,
+  Xcode user data, build output, Wine prefixes, Steam login data
+- changed copies of Madeira's binary files, which a local build rewrites
+- commits and tags whose author, committer or tagger is not a GitHub noreply
+  address
 
-| Topic | Document |
-|---|---|
-| Building from a clean checkout | [`docs/BUILDING.md`](docs/BUILDING.md) |
-| StikDebug and built-in JIT setup | [`docs/JIT.md`](docs/JIT.md) |
-| The game library | [`docs/LIBRARY.md`](docs/LIBRARY.md) |
-| Steam sign-in, library and downloads | [`docs/STEAM_SIGNIN.md`](docs/STEAM_SIGNIN.md), [`docs/STEAM_LIBRARY.md`](docs/STEAM_LIBRARY.md) |
-| Steam Cloud saves | [`docs/STEAM_CLOUD.md`](docs/STEAM_CLOUD.md) |
-| Madeira Dock (the Steam client) | [`docs/MADEIRA_DOCK.md`](docs/MADEIRA_DOCK.md) |
-| 32-bit games (WoW64) | [`docs/WOW64.md`](docs/WOW64.md) |
-| Controllers and touch controls | [`docs/CONTROLLERS.md`](docs/CONTROLLERS.md) |
-| Keyboard, mouse and trackpad | [`docs/KEYBOARD_MOUSE.md`](docs/KEYBOARD_MOUSE.md) |
-| Audio and video | [`docs/MEDIA.md`](docs/MEDIA.md) |
-| Licensing in detail | [`docs/LICENSING.md`](docs/LICENSING.md) |
+A GitHub Actions workflow runs `check-personal.sh --everything` on every push,
+with the generic checks. It finds a leak after it has been pushed. The hooks
+are what prevent it, so commit and push from a terminal, where they run.
 
-## Licensing
+For Claude Code, `.claude/hooks/guard-git.sh` refuses commands that would skip
+the hooks (`--no-verify`, `git commit -n`, changing `core.hooksPath`), and
+checks the text of `gh` PRs, issues and releases.
 
-Madeira is licensed under **GPL-3.0-or-later** ([`LICENSE`](LICENSE)) with
-the **Madeira Converter Exception** ([`LICENSE-EXCEPTION.md`](LICENSE-EXCEPTION.md)),
-an additional permission that allows it to work with Apple's Metal Shader
-Converter.
+## AI-assisted work
 
-The projects it builds on keep their own licenses upstream, but Madeira's forks
-are not all licensed the same way as their upstreams:
-
-| Component | License |
-|---|---|
-| [Wine fork](https://github.com/willfaust/wine) | LGPL-2.1-or-later, like upstream Wine |
-| [FEX-Emu fork](https://github.com/willfaust/FEX), [DXMT fork](https://github.com/willfaust/dxmt) | Upstream code stays MIT; Madeira's changes are GPL-3.0-or-later with the exception |
-| [rpmalloc fork](https://github.com/willfaust/rpmalloc) | Upstream code stays 0BSD; Madeira's changes are GPL-3.0-or-later with the exception |
-| [Madeira Dock](https://github.com/willfaust/madeira-dock) | GPL-3.0-or-later with the exception |
-
-Anything obtained earlier under a permissive license stays available under it.
-Per-component details, including GnuTLS, Nettle, GMP, FFmpeg and LLVM, are in
-[`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md); the license texts are in
-[`LICENSES/`](LICENSES).
-
-Microsoft's Visual C++ runtime DLLs are **not** distributed with Madeira. To
-build with them, supply them yourself as described in
-[`tools/fetch-vcruntime.md`](tools/fetch-vcruntime.md).
-
-## Contributing
-
-Contributions are welcome under GPL-3.0-or-later; see
-[`CONTRIBUTING.md`](CONTRIBUTING.md).
-
-Madeira's forks contain a lot of AI-assisted work. FEX-Emu does not accept
-AI-generated code, so please **do not send changes from these forks upstream**
-to FEX-Emu, and check each upstream project's contribution policy before
+Akvavit's changes were written with AI assistance (Claude Code). Like
+Madeira's forks, they must not be sent to FEX-Emu, which doesn't accept
+AI-generated code. Check each upstream project's contribution policy before
 proposing anything to it.
+
+## License
+
+GPL-3.0-or-later, the same as Madeira, including Madeira's
+[Converter Exception](LICENSE-EXCEPTION.md). See [LICENSE](LICENSE) and
+[CONTRIBUTING.md](CONTRIBUTING.md). Commits are signed off under the
+[Developer Certificate of Origin](https://developercertificate.org/).
 
 ## Credits
 
-- **Will Faust** ([@willfaust](https://github.com/willfaust)): created Madeira
-- **Nick** ([@125hz](https://github.com/125hz)): 32-bit game support, the game library and Madeira Dock
-- **Jfishin** ([@Jfishin](https://github.com/Jfishin)): the original native Steam sign-in, library and downloads
-- **Jesse** ([@JesseLovelace](https://github.com/JesseLovelace)): Steam Cloud saves, faster game launches, and fixes that let more games run
-- **Dan Perks** ([@danperks](https://github.com/danperks)): in-app JIT without StikDebug, and pairing without a computer
-- **bahacan16** ([@bahacan16](https://github.com/bahacan16)): Direct3D 12 and DXMT fixes, game launcher windows, per-game settings, PlayStation controllers, and save backups
-- **spitefulowl** ([@spitefulowl](https://github.com/spitefulowl)): Wine and FEX runtime fixes, DXMT texture and memory fixes, audio, the swap tier, and library launch options
-- **meshoklv** ([@meshoklv](https://github.com/meshoklv)): controller fixes for games that ship their own XInput or need focus, touch taps that stay off the mouse, and a crash-guard fix
-- **TheHadesc** ([@TheHadesc](https://github.com/TheHadesc)): Madeira Dock starts for games whose Steam launch entries do not start at zero, and a touch gamepad that survives the in-game keyboard
-
-Madeira is built on [Wine](https://www.winehq.org/), [FEX-Emu](https://github.com/FEX-Emu/FEX),
-[DXMT](https://github.com/3Shain/DXMT) by Feifan He (3Shain) with the Direct3D 9
-frontend by David Acevedo (dacevedo12), [rpmalloc](https://github.com/mjansson/rpmalloc)
-by Mattias Jansson, [StikDebug](https://github.com/StikDebug/StikDebug),
-[StikJIT](https://github.com/StikDebug/StikJIT) and
-[idevice](https://github.com/jkcoxson/idevice) for enabling JIT. Thank you to everyone who contributes to them.
-
-<p align="center">
-  <a href="https://discord.gg/4t5mNjwCn7"><b>Join the community on Discord</b></a>
-</p>
+All credit for running Windows games on iOS goes to Madeira and its
+contributors (see [MADEIRA.md](MADEIRA.md)), and to the projects it builds on:
+FEX-Emu, Wine, DXMT, StikJIT, StikDebug and idevice. Akvavit is not affiliated
+with Madeira.
