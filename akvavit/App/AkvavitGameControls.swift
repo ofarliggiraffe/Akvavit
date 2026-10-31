@@ -285,6 +285,7 @@ enum AkvavitGameControls {
     /// come back, and InputSettings writes its file again (with any other setting
     /// changed during the session).
     static func end() {
+        AkvavitStickyKeys.shared.release()
         guard holdsInputFile else { return }
         holdsInputFile = false
         if let global { apply(global) }

@@ -3992,11 +3992,11 @@ struct TouchControl: Codable, Identifiable, Equatable {
     var padBinding: String?
     /// Locked in place: the editor selects it but will not move or resize it.
     var locked: Bool?
-    /// Akvavit: the user's own label for the button, and modifier keys held with its
-    /// key (Ctrl+1 and such; AkvavitControlLabels.swift). Optional, so layouts saved
-    /// before they existed still decode.
+    /// Akvavit: the user's own label for the button, and a sticky Ctrl, Shift or Alt
+    /// (AkvavitControlLabels.swift). Optional, so layouts saved before they existed
+    /// still decode.
     var customLabel: String?
-    var modifiers: [Int32]?
+    var sticky: Bool?
 }
 
 final class TouchControlsModel: ObservableObject {
@@ -4559,6 +4559,7 @@ struct TouchControlButton: View {
         .animation(.spring(response: 0.22, dampingFraction: 0.58), value: stickDir)
         // Akvavit: no delete badge on the selected control, where it got in the way of
         // dragging; MappingPanel's row deletes it (AkvavitControlLabelRow).
+        .overlay { AkvavitStickyMark(control: control, shape: outline) }   // Akvavit: a sticky key that is down
         .overlay {
             if let action = control.action.padName, !m.editing {
                 TouchPadSurface(control: control.id, action: action) { vector, down in
@@ -4660,7 +4661,7 @@ struct TouchControlButton: View {
         }
         switch control.action {
         case .key(let vk):
-            AkvavitKeyCombo.press(vk, modifiers: control.modifiers, down: down)   // Akvavit: with its modifiers
+            AkvavitStickyKeys.shared.press(vk, sticky: control.sticky == true, down: down)   // Akvavit: sticky modifiers
         case .mouseLeft:
             winios_pointer(0, 0, down ? 0x0002 : 0x0004, 0)   // LEFTDOWN / LEFTUP
         case .mouseRight:
