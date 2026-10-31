@@ -3968,7 +3968,8 @@ enum ControlAction: Codable, Equatable, Hashable {
             if vk >= 0x30, vk <= 0x5A, let u = UnicodeScalar(UInt32(vk)) {
                 return String(Character(u))
             }
-            return String(format: "%02X", vk)
+            // Akvavit: F-keys, the keypad and the rest by name (AkvavitControlLabels.swift).
+            return AkvavitKeyNames.label(vk) ?? String(format: "%02X", vk)
         }
     }
 }
@@ -3991,6 +3992,11 @@ struct TouchControl: Codable, Identifiable, Equatable {
     var padBinding: String?
     /// Locked in place: the editor selects it but will not move or resize it.
     var locked: Bool?
+    /// Akvavit: the user's own label for the button, and modifier keys held with its
+    /// key (Ctrl+1 and such; AkvavitControlLabels.swift). Optional, so layouts saved
+    /// before they existed still decode.
+    var customLabel: String?
+    var modifiers: [Int32]?
 }
 
 final class TouchControlsModel: ObservableObject {
@@ -4529,9 +4535,11 @@ struct TouchControlButton: View {
             } else {
                 // The label is the glass's content (see glassFace), so it is drawn
                 // on top of the glass rather than blurred underneath it.
-                Text(control.action.label)
-                    .font(.system(size: diameter * (control.action.label.count > 2 ? 0.22 : 0.34),
+                Text(control.displayLabel)   // Akvavit: the user's own label, if any
+                    .font(.system(size: diameter * (control.displayLabel.count > 2 ? 0.22 : 0.34),
                                   weight: .medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
                     .foregroundStyle(.white.opacity(isDown ? 1.0 : 0.85))
                     .frame(width: size.width, height: size.height)
                     .glassFace(GlassShape(circle: true))
@@ -4549,23 +4557,8 @@ struct TouchControlButton: View {
         // glass control animated its press; the state change now applies at once.
         // ml646: the springy knob, same curve as the portrait pad overlay.
         .animation(.spring(response: 0.22, dampingFraction: 0.58), value: stickDir)
-        .overlay(alignment: .topTrailing) {
-            if isSelected && control.locked != true {
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    m.controls.removeAll { $0.id == control.id }
-                    m.selected = nil
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 22, height: 22)
-                        .background(Circle().fill(.red.opacity(0.85)))
-                }
-                .buttonStyle(.plain)
-                .offset(x: 8, y: -8)
-            }
-        }
+        // Akvavit: no delete badge on the selected control, where it got in the way of
+        // dragging; MappingPanel's row deletes it (AkvavitControlLabelRow).
         .overlay {
             if let action = control.action.padName, !m.editing {
                 TouchPadSurface(control: control.id, action: action) { vector, down in
@@ -4667,7 +4660,7 @@ struct TouchControlButton: View {
         }
         switch control.action {
         case .key(let vk):
-            winios_post_key(vk, down ? 1 : 0)
+            AkvavitKeyCombo.press(vk, modifiers: control.modifiers, down: down)   // Akvavit: with its modifiers
         case .mouseLeft:
             winios_pointer(0, 0, down ? 0x0002 : 0x0004, 0)   // LEFTDOWN / LEFTUP
         case .mouseRight:
@@ -4706,6 +4699,11 @@ struct MappingPanel: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(control.locked == true ? "Unlock control" : "Lock control")
             }
+            Rectangle().fill(.white.opacity(0.15)).frame(height: 1)
+            // Akvavit: the control's label and its delete button (AkvavitControlLabels.swift).
+            AkvavitControlLabelRow(control: control)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
             Rectangle().fill(.white.opacity(0.15)).frame(height: 1)
             LayerButtons { mv in if let i = m.index(of: control.id) { mv.apply(&m.controls, i) } }
                 .padding(.horizontal, 10)

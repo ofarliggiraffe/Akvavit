@@ -213,6 +213,7 @@ with tempfile.TemporaryDirectory(prefix='madeira-presets-') as tmp:
     header += 'enum AkvavitGameControls { static let builtInPresets: [ControlPreset] = [] }\n'
     header += ('enum AkvavitBuiltInLayouts { static func applied(_ p: [ControlPreset]) -> [ControlPreset] { p }; '
                'static func isEdited(_ id: String) -> Bool { false } }\n')
+    header += 'enum AkvavitKeyNames { static func label(_ vk: Int32) -> String? { nil } }\n'
     src.write_text(header + actions + pure_touch + pure + tests)
     subprocess.run([os.environ.get('SWIFTC', 'swiftc'), str(src), '-o', str(exe)], check=True)
     subprocess.run([str(exe)], check=True)

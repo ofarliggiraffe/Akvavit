@@ -322,6 +322,15 @@ through Dock at 60 FPS, RT2, Portal).
     `editingEnded` would write a game's edit back into its named layout;
     `editsStayWithGame` makes it the game's own copy instead (except a layout
     just created empty).
+  - **Button labels and key combinations** (`AkvavitControlLabels.swift`):
+    `AkvavitKeyNames` names the keys Madeira's `keyLabel` left in hex (F1 was
+    "70"). `TouchControl.customLabel` and `TouchControl.modifiers` (Ctrl,
+    Shift, Alt held with the key: "Ctrl+1") are set in the mapping panel's
+    row (`AkvavitControlLabelRow`), which also deletes the control (the red
+    badge on the button is gone). Combinations work by touch only; a
+    controller button bound to the control sends the key alone. The panel's
+    text field makes the controls window key while typing (it is never key
+    otherwise). The user prefers words over symbols in the UI.
   - Planned: a Strategy layout, and the type chosen automatically from
     Steam's genres.
 - Madeira's host test `tests/host/check-control-presets.py` compiles part of
