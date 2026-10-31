@@ -291,7 +291,8 @@ enum DockInstallScripts {
                 let exe = expand(raw, installDir: installDir)
                 let lower = exe.lowercased()
                 guard exe.count > 3, exe.hasPrefix("C:\\"), !exe.contains("%"), !exe.contains("\""),
-                      !exe.contains(".."), lower.hasSuffix(".exe") || lower.hasSuffix(".msi") else { continue }
+                      !exe.contains(".."), lower.hasSuffix(".exe") || lower.hasSuffix(".msi") ||
+                      AkvavitInstallScripts.isBatch(lower) else { continue }   // Akvavit: Steam's .cmd wrappers too
                 let args = expand(fields["command \(number)"] ?? "", installDir: installDir, path: false)
                     .trimmingCharacters(in: .whitespaces)
                 // No cmd.exe metacharacters: the arguments go into a batch line as they are.
@@ -431,7 +432,9 @@ enum DockInstallScripts {
         var ended = false
         var services: String?
         var running: Int? { started.keys.filter { exits[$0] == nil }.max() }
-        static func succeeded(_ status: Int) -> Bool { status == 0 || status == 3010 || status == 1641 }
+        static func succeeded(_ status: Int) -> Bool {
+            status == 0 || status == 3010 || status == 1641 || AkvavitInstallScripts.alreadyNewer(status)   // Akvavit
+        }
     }
 
     static func results(_ text: String) -> Results {
@@ -879,6 +882,7 @@ enum DockInstallers {
         // A Record as done / Reset request saved since the last start, before the plan reads
         // the registry.
         applyRequest(game, found: found, prefix: prefix, drive: drive, others: others)
+        AkvavitInstallScripts.recordSupplied(found, prefix: prefix)   // Akvavit: Visual C++ 14 the app supplies
         guard !found.isEmpty else {
             LogStore.shared.log("[dock-installers] app=\(app) scripts=\(scripts) programs=0"); return
         }

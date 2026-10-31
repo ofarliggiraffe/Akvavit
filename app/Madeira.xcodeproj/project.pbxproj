@@ -129,6 +129,7 @@
 		A1000080 /* arm64ec-windows in Resources */ = {isa = PBXBuildFile; fileRef = A2000080 /* arm64ec-windows */; };
 		A1000210 /* i386-windows in Resources */ = {isa = PBXBuildFile; fileRef = A2000210 /* i386-windows */; };
 		A1000081 /* x86_64-vcruntime in Resources */ = {isa = PBXBuildFile; fileRef = A2000081 /* x86_64-vcruntime */; };
+		A1000F82 /* i386-vcruntime in Resources */ = {isa = PBXBuildFile; fileRef = A2000F82 /* i386-vcruntime */; };
 		A1000082 /* x86_64-opengl in Resources */ = {isa = PBXBuildFile; fileRef = A2000082 /* x86_64-opengl */; };
 		A1000090 /* libgnutls.a in Frameworks */ = {isa = PBXBuildFile; fileRef = A2000090 /* libgnutls.a */; };
 		A1000091 /* libhogweed.a in Frameworks */ = {isa = PBXBuildFile; fileRef = A2000091 /* libhogweed.a */; };
@@ -194,6 +195,9 @@
 		A39A82440EEDF9E19A5394A2 /* AkvavitControlsSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CE07D75AEC0E0E1D4777D6A /* AkvavitControlsSettings.swift */; };
 		C2A3644BE943A1F7CDA04D13 /* AkvavitLayoutEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5B64A0DDAEAD489E0B8EE73 /* AkvavitLayoutEditor.swift */; };
 		3750EAA7609CB30CCC9296EF /* AkvavitControlLabels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D9A59EE455B12957D7DE7A9 /* AkvavitControlLabels.swift */; };
+		01584E47BBCC13CF8BB1DC99 /* AkvavitSteamRedist.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE666CCDC2DF37976A41441C /* AkvavitSteamRedist.swift */; };
+		B318619A5ECFFEFDD17BBCF4 /* AkvavitInstallScripts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 264F41746EB750E4FEDA1D40 /* AkvavitInstallScripts.swift */; };
+		C3FBD56EC444A6D720287434 /* AkvavitVCRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DD70F788ED7D72BCD1F679C /* AkvavitVCRuntime.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -378,6 +382,7 @@
 		A2000080 /* arm64ec-windows */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "arm64ec-windows"; sourceTree = "<group>"; };
 		A2000210 /* i386-windows */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "i386-windows"; sourceTree = "<group>"; };
 		A2000081 /* x86_64-vcruntime */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "x86_64-vcruntime"; sourceTree = "<group>"; };
+		A2000F82 /* i386-vcruntime */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "i386-vcruntime"; sourceTree = "<group>"; };
 		A2000082 /* x86_64-opengl */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "x86_64-opengl"; sourceTree = "<group>"; };
 		A2000090 /* libgnutls.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libgnutls.a; sourceTree = "<group>"; };
 		A2000091 /* libhogweed.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libhogweed.a; sourceTree = "<group>"; };
@@ -445,6 +450,9 @@
 		1CE07D75AEC0E0E1D4777D6A /* AkvavitControlsSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "AkvavitControlsSettings.swift"; path = "../akvavit/App/AkvavitControlsSettings.swift"; sourceTree = SOURCE_ROOT; };
 		C5B64A0DDAEAD489E0B8EE73 /* AkvavitLayoutEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "AkvavitLayoutEditor.swift"; path = "../akvavit/App/AkvavitLayoutEditor.swift"; sourceTree = SOURCE_ROOT; };
 		1D9A59EE455B12957D7DE7A9 /* AkvavitControlLabels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "AkvavitControlLabels.swift"; path = "../akvavit/App/AkvavitControlLabels.swift"; sourceTree = SOURCE_ROOT; };
+		EE666CCDC2DF37976A41441C /* AkvavitSteamRedist.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "AkvavitSteamRedist.swift"; path = "../akvavit/App/AkvavitSteamRedist.swift"; sourceTree = SOURCE_ROOT; };
+		264F41746EB750E4FEDA1D40 /* AkvavitInstallScripts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "AkvavitInstallScripts.swift"; path = "../akvavit/App/AkvavitInstallScripts.swift"; sourceTree = SOURCE_ROOT; };
+		8DD70F788ED7D72BCD1F679C /* AkvavitVCRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "AkvavitVCRuntime.swift"; path = "../akvavit/App/AkvavitVCRuntime.swift"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -658,6 +666,7 @@
 				A20000D1 /* d3d12 */,
 				A20000D2 /* licenses */,
 				A2000081 /* x86_64-vcruntime */,
+				A2000F82 /* i386-vcruntime */,
 				A2000082 /* x86_64-opengl */,
 				A2000040 /* prefix-template.tar.gz */,
 				A2000094 /* cacert.pem */,
@@ -745,6 +754,9 @@
 		7115A7D2CFB920A7816DDCA2 /* Akvavit */ = {
 			isa = PBXGroup;
 			children = (
+				8DD70F788ED7D72BCD1F679C /* AkvavitVCRuntime.swift */,
+				264F41746EB750E4FEDA1D40 /* AkvavitInstallScripts.swift */,
+				EE666CCDC2DF37976A41441C /* AkvavitSteamRedist.swift */,
 				1D9A59EE455B12957D7DE7A9 /* AkvavitControlLabels.swift */,
 				C5B64A0DDAEAD489E0B8EE73 /* AkvavitLayoutEditor.swift */,
 				1CE07D75AEC0E0E1D4777D6A /* AkvavitControlsSettings.swift */,
@@ -876,6 +888,7 @@
 				A10000D1 /* d3d12 in Resources */,
 				A10000D2 /* licenses in Resources */,
 				A1000081 /* x86_64-vcruntime in Resources */,
+				A1000F82 /* i386-vcruntime in Resources */,
 				A1000082 /* x86_64-opengl in Resources */,
 				A1000040 /* prefix-template.tar.gz in Resources */,
 				A1000094 /* cacert.pem in Resources */,
@@ -940,6 +953,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C3FBD56EC444A6D720287434 /* AkvavitVCRuntime.swift in Sources */,
+				B318619A5ECFFEFDD17BBCF4 /* AkvavitInstallScripts.swift in Sources */,
+				01584E47BBCC13CF8BB1DC99 /* AkvavitSteamRedist.swift in Sources */,
 				3750EAA7609CB30CCC9296EF /* AkvavitControlLabels.swift in Sources */,
 				C2A3644BE943A1F7CDA04D13 /* AkvavitLayoutEditor.swift in Sources */,
 				A39A82440EEDF9E19A5394A2 /* AkvavitControlsSettings.swift in Sources */,

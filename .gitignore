@@ -166,6 +166,8 @@ build/wine-mono/wine-mono-*
 # redistributable terms and only unmodified. Not ours to ship -- obtain them
 # yourself, see tools/fetch-vcruntime.md.
 app/Madeira/x86_64-vcruntime/*.dll
+# Akvavit: 32-bit MFC from Microsoft's redistributable (akvavit/scripts/prepare-vcruntime-extra.sh).
+app/Madeira/i386-vcruntime/*.dll
 
 # Mesa OpenGL on D3D12 and Microsoft's DXIL validator: build/mesa-d3d12/build.sh
 # output. dxil.dll is Microsoft-authored and licence-bound (LICENSE-dxil.txt);

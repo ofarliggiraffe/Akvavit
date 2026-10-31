@@ -675,6 +675,9 @@ static BOOL madeira_bundle_has_i386(NSString *bundle)
     return access(ntdll.fileSystemRepresentation, R_OK) == 0;
 }
 
+/* Akvavit: Microsoft's 32-bit MFC into syswow64 (akvavit/App/AkvavitVCRuntime.swift). */
+extern void akvavit_link_vcruntime_x86(const char *prefix, const char *bundle);
+
 /* C:\windows\syswow64: the i386 farm, the Windows name for this pattern. A
  * 32-bit process's system32 is redirected here, and the unix loader's
  * machine -> directory mapping looks here for the 32-bit ntdll, kernel32 and
@@ -2052,6 +2055,7 @@ static void *wine_process_thread(void *arg) {
              * loader with c0000135 for DLLs syswow64 still had. */
             if (has_i386_set) {
                 madeira_link_syswow64(fm, prefix, bundlePath);
+                akvavit_link_vcruntime_x86(prefix.fileSystemRepresentation, bundlePath.fileSystemRepresentation);   /* Akvavit */
                 madeira_link_syswow64_wbem(fm, prefix, bundlePath);
                 madeira_seed_winsxs_x86(fm, prefix, bundlePath);
             }

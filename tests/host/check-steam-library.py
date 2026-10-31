@@ -521,6 +521,7 @@ size_t compression_decode_buffer(uint8_t *dst, size_t dst_size, const uint8_t *s
 DECODERS_H = '#include "{app}/SwiftSteam/lzma_shim.h"\n'
 
 STUBS = r'''
+enum AkvavitSteamRedist { static func depots(of app: SteamAppInfo) -> [(depotID: Int, ownerAppID: Int)] { [] } }  // Akvavit: akvavit/App/AkvavitSteamRedist.swift
 enum ExternalDrives { static var steamLibraries: [String] { [] } }
 import Foundation
 #if canImport(FoundationNetworking)

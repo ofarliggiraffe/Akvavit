@@ -52,6 +52,9 @@ caffeinate -i bash "$stages" >"$log" 2>&1 || {
     die "Native build failed; full log: $log"
 }
 
+# Microsoft's MFC, 32-bit and 64-bit, which Madeira's runtime step leaves out.
+"$ROOT/akvavit/scripts/prepare-vcruntime-extra.sh"
+
 echo "Verifying the runtime components"
 python3 "$M/tools/build/runtime-components.py" verify all
 

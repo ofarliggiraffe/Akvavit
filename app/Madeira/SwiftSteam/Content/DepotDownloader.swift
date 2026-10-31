@@ -249,7 +249,8 @@ final class DepotDownloader {
             appID: app.appID, name: app.name, installDir: folderName, buildID: app.buildID,
             steamID: accountID, sizeOnDisk: prepared.totalUncompressed,
             steamAppsPath: steamApps.path, installedDepots: own,
-            sharedDepots: shared.map { ($0.depotID, Int(owners[UInt32($0.depotID)]!)) },
+            sharedDepots: shared.map { ($0.depotID, Int(owners[UInt32($0.depotID)]!)) }
+                + AkvavitSteamRedist.depots(of: app),   // Akvavit: the redistributables, as Valve's client lists them
             customExecutables: custom, language: app.gameLanguage)
         if !shared.isEmpty {
             var written = 0, skipped = 0

@@ -252,6 +252,36 @@ through Dock at 60 FPS, RT2, Portal).
   A game's Controller choice "XInput and DirectInput" doesn't work through
   Dock: it's exported at Play, but Windows programs inherit their environment
   from Steam, which started earlier. DirectInput reads it from there.
+- **Steam's shared redistributables** (Age of Empires II HD and DE):
+  - Games can take depots from "Steamworks Common Redistributables" (228980:
+    Visual C++ and DirectX installers, `depotfromapp` + `sharedinstall`).
+    Madeira's downloader skipped them, so 228980 had no record and Valve's
+    client refused the launch (error 17: "Steam is installing content this
+    game needs…" for ever). `AkvavitSteamRedist.swift` downloads them before
+    a game's download or Repair, as 228980's own install in
+    `common/Steamworks Shared`, and the game's record lists them as
+    `SharedDepots`.
+  - Madeira Dock's one-time installs then run their scripts. Madeira took
+    only `.exe`/`.msi`; Steam's Visual C++ 2015-2022 scripts run `.cmd`
+    wrappers (`AkvavitInstallScripts.swift`; exit 1638, "newer installed",
+    counts as done).
+  - Microsoft's Visual C++ 14 installer engine hangs in Akvavit (2015 and
+    2022 did; Madeira met it with Red Dead Redemption 2), and DirectX setup
+    can't work (its 64-bit `infinst.exe` must load at 0x100000000, where iOS
+    keeps the app; c0000018). So Steam's Visual C++ 2015+ and DirectX runs
+    are recorded as done when the build supplies them (`[akvavit-redist]`).
+    2012 and 2013 still run, and install fine.
+  - Visual C++ 14 for 32-bit programs: Wine's own runtime plus Microsoft's
+    32-bit MFC, which AoE II HD's launcher imports. Madeira supplies only the
+    64-bit runtime, and its build step left out MFC.
+    `akvavit/scripts/prepare-vcruntime-extra.sh` (run by `build-native.sh`)
+    extracts `mfc140.dll`/`mfc140u.dll` from Microsoft's redistributables,
+    32-bit into `app/Madeira/i386-vcruntime` and 64-bit beside Madeira's
+    (both git-ignored, never committed). `AkvavitVCRuntime.swift` links the
+    32-bit ones into `syswow64` at each session (`Documents/vcruntime-x86`
+    overrides; `env.MADEIRA_MFC = 0` leaves them out).
+  - Verified 2026-10-31: AoE II HD (Steam, 32-bit, Direct3D 9) starts and
+    plays through Dock.
 - **The Steam version of Railroad Tycoon 3** (app 7610) is packed with Steam's
   copy protection: without a running Steam client it stops with "Failed to
   find Steam". So it needs Madeira Dock (works), or a DRM-free copy.

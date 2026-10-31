@@ -104,6 +104,7 @@ import Foundation
 import FoundationNetworking
 #endif
 enum MadeiraConfig { static func get(_ key: String) -> String? { nil } }
+enum AkvavitSteamRedist { static func depots<App>(of app: App) -> [(depotID: Int, ownerAppID: Int)] { [] } }  // Akvavit: akvavit/App/AkvavitSteamRedist.swift
 enum SteamLog { static func trace(_ m: @autoclosure () -> String) {}; static func event(_ m: String) {} }
 final class SteamTokenStore {
     struct StoredTokens { var accountName: String; var refreshToken: String; var accessToken: String; var steamID: UInt64; var savedAt: Date }

@@ -183,6 +183,29 @@ func pe(_ url: URL, machine: UInt16) throws {
         require(SteamInstallScripts.keys(runtime.run) == ["Software\\Valve\\Steam\\Apps\\7000", "Software\\Wow6432Node\\Valve\\Steam\\Apps\\7000"], "both registry views")
         require(SteamInstallScripts.keys(SteamInstallRun(name: "u", hive: .user, key: "Software\\X", value: 1)) == ["Software\\X"], "HKCU: one view")
         require(SteamInstallScripts.entries(script: Data(script.utf8), appID: 0).count == 1, "invalid app IDs add nothing")
+        // Akvavit (akvavit/App/AkvavitInstallScripts.swift): Steam's Visual C++ 2015-2022 scripts run .cmd wrappers.
+        let wrapper = DockInstallScripts.processes(script: Data("""
+        "InstallScript" { "Run Process" { "x86 14.0" { "HasRunKey" "HKEY_LOCAL_MACHINE\\\\Software\\\\Valve\\\\Steam\\\\Apps\\\\CommonRedist\\\\vcredist\\\\2015"
+            "process 1" "%INSTALLDIR%\\\\_CommonRedist\\\\vcredist\\\\2015\\\\Microsoft Visual C++ 2015 x86.cmd" } } }
+        """.utf8), installDir: "C:\\Steam\\steamapps\\common\\Steamworks Shared")
+        require(wrapper.map(\.executable) == ["C:\\Steam\\steamapps\\common\\Steamworks Shared\\_CommonRedist\\vcredist\\2015\\Microsoft Visual C++ 2015 x86.cmd"],
+                "a .cmd wrapper is a program (\(wrapper.map(\.executable)))")
+        require(DockInstallScripts.Results.succeeded(1638) && !DockInstallScripts.Results.succeeded(1603), "1638, a newer version installed, counts as done; 1603 does not")
+        // Steam's shared Visual C++ 14 runs (2015 and later) count as supplied by the app; older runtimes,
+        // DirectX and a game folder's own Visual C++ do not.
+        let shared = "C:\\Steam\\steamapps\\common\\Steamworks Shared"
+        func vc(_ year: String, _ name: String, in dir: String = shared) -> SteamInstallProcess {
+            SteamInstallProcess(run: SteamInstallRun(name: name, hive: .machine, key: "Software\\Valve\\Steam\\Apps\\CommonRedist\\" + year, value: 1),
+                                executable: dir + "\\_CommonRedist\\x\\setup.exe", arguments: "")
+        }
+        let programs = [vc("vcredist\\2013", "x86 2013"), vc("vcredist\\2015", "x86 2015"),
+            vc("vcredist\\2015", "x86 2015"), vc("vcredist\\2022", "x64 2022"), vc("DirectX\\Jun2010", "dxsetup"),
+            vc("vcredist\\2019", "game 2019", in: "C:\\Steam\\steamapps\\common\\Fixture Game"),
+            vc("DirectX\\Jun2010", "game dx", in: "C:\\Steam\\steamapps\\common\\Fixture Game")]
+        let supplied = AkvavitInstallScripts.suppliedRuns(programs, available: [.visualCpp14, .directX])
+        require(supplied.map(\.name) == ["x86 2015", "x64 2022", "dxsetup"], "Visual C++ 14 and DirectX from Steamworks Shared count as supplied, once (\(supplied.map(\.name)))")
+        require(AkvavitInstallScripts.suppliedRuns(programs, available: [.directX]).map(\.name) == ["dxsetup"], "only what the build supplies")
+        require(AkvavitInstallScripts.suppliedRuns(programs, available: []).isEmpty, "nothing supplied, nothing recorded")
 
         // ---- recorded values
         let record = """
@@ -546,7 +569,8 @@ with tempfile.TemporaryDirectory(prefix='madeira-dock-installers-') as tmp:
     else:
         build = subprocess.run([SWIFTC, '-parse-as-library', '-swift-version', '5', '-sanitize=address', '-o', str(exe),
                                 str(tmp / 'stubs.swift'), str(tmp / 'checks.swift'), str(app / 'DockInstallers.swift'),
-                                str(app / 'DockReset.swift')])
+                                str(app / 'DockReset.swift'), str(root / 'akvavit/App/AkvavitInstallScripts.swift'),
+                                str(root / 'akvavit/App/AkvavitVCRuntime.swift')])
         require(build.returncode == 0, 'production installer Swift compiles on the host')
     if build is not None and build.returncode == 0:
         run = subprocess.run([str(exe), str(tmp / 'fixture.cmd')], env=dict(os.environ, ASAN_OPTIONS='detect_leaks=0'))

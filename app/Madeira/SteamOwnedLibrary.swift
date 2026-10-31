@@ -1209,6 +1209,11 @@ final class SteamOwnedLibrary: ObservableObject {
             _ = try ExternalDrives.nativeURL(library + "/downloading/\(appID)", write: true)
             try FileManager.default.createDirectory(at: common, withIntermediateDirectories: true)
             SteamLog.event("[steam-depot] install app=\(appID) library=\(library)")
+            // Akvavit: Steam's shared redistributables first, as the owner app's install (AkvavitSteamRedist).
+            try await AkvavitSteamRedist.install(for: info, library: library, fetcher: fetcher, downloader: downloader) { [weak self] progress in
+                self?.downloads[appID]?.progress = progress
+                SteamDownloadBackground.shared.progress(progress)
+            }
             let folder = try await downloader.install(info, steamApps: steamApps,
                                                       ownedDepots: { [weak self] in try? await self?.fetcher.ownedDepotIDs() }) { [weak self] progress in
                 self?.downloads[appID]?.progress = progress
