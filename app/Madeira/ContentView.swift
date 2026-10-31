@@ -4190,11 +4190,13 @@ struct TouchControlsOverlay: View {
             // HUD (menu button, starting screen, in-game menu) replaces the top
             // bar; the controls hide while its menu or starting screen is up.
             let session = library.current != nil || library.preparing != nil
-            let landscape = geo.size.width > geo.size.height || session
+            // Akvavit: the editor opened from the settings (AkvavitLayoutEditor) also draws in portrait.
+            let landscape = geo.size.width > geo.size.height || session || AkvavitLayoutEditor.isOpen
             ZStack(alignment: .top) {
                 // The library between sessions (the window came up for a start that did not
                 // happen) draws nothing over the library's own screens.
                 if landscape && !(library.enabled && !session && !m.editing) {
+                    AkvavitEditorBackdrop()   // Akvavit: under the controls, while that editor is open
                     if (m.visible || m.editing) && !library.blocksGameplayTouch {
                         if GestureZonesModel.enabled {
                             GestureZonesLayer(screen: geo.size, editing: m.editing)

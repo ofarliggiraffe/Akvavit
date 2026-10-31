@@ -232,10 +232,13 @@ enum ControlPresetLayout {
 /// The layout list: built-ins (read-only, in code), then the user's own
 /// (persisted). Pure value type; `ControlPresetsModel` owns the file.
 struct ControlPresetStore: Equatable {
-    static let builtIns: [ControlPreset] = [
-        ControlPreset(id: ControlPresetLayout.xboxID, name: ControlPresetLayout.xboxName,
-                      controls: ControlPresetLayout.xbox(for: .referencePhone)),
-    ] + AkvavitGameControls.builtInPresets   // Akvavit: the FPS layout
+    // Akvavit: also the FPS layout, and the user's edits of built-ins (Settings › Controls › Layouts).
+    static var builtIns: [ControlPreset] {
+        AkvavitBuiltInLayouts.applied([
+            ControlPreset(id: ControlPresetLayout.xboxID, name: ControlPresetLayout.xboxName,
+                          controls: ControlPresetLayout.xbox(for: .referencePhone)),
+        ] + AkvavitGameControls.builtInPresets)
+    }
     static let maxNameLength = 40
 
     private(set) var user: [ControlPreset] = []
@@ -334,7 +337,7 @@ struct ControlPresetStore: Equatable {
     /// loaded on.
     static func layout(of p: ControlPreset, screen: ControlPresetScreen?) -> [TouchControl] {
         var controls = p.controls
-        if p.id == ControlPresetLayout.xboxID, let screen {
+        if p.id == ControlPresetLayout.xboxID, !AkvavitBuiltInLayouts.isEdited(p.id), let screen {   // Akvavit: an edited one as saved
             let fitted = ControlPresetLayout.xbox(for: screen)
             if !fitted.isEmpty { controls = fitted }
         }
@@ -472,6 +475,16 @@ final class ControlPresetsModel: ObservableObject {
         log("loaded layout=\(ControlPresetStore.isBuiltIn(p.id) ? "xbox" : "custom") controls=\(controls.count) reason=\(reason)")
     }
 
+    /// Akvavit: a change made in Settings › Controls › Layouts (AkvavitControlsSettings.swift),
+    /// saved like the layout menu's.
+    @discardableResult func change(_ edit: (inout ControlPresetStore) -> Bool) -> Bool {
+        guard !readOnly else { return false }
+        var s = store
+        guard edit(&s) else { return false }
+        store = s
+        return persist()
+    }
+
     /// Keep the unsaved on-screen controls as the next "Custom Layout N".
     @discardableResult func keepCurrent() -> Bool {
         guard !readOnly else { return false }
@@ -529,7 +542,10 @@ final class ControlPresetsModel: ObservableObject {
         guard Self.enabled else { return }
         let m = TouchControlsModel.shared
         guard let id = m.layoutID else { return }
-        if ControlPresetStore.isBuiltIn(id) {
+        // Akvavit: a game's edit of a named layout stays with the game (AkvavitGameControls),
+        // except in a layout just created empty.
+        if ControlPresetStore.isBuiltIn(id)
+            || (AkvavitGameControls.editsStayWithGame && !(baseline.isEmpty && zoneBaseline.isEmpty)) {
             if baseline != m.controls || zoneBaseline != GestureZonesModel.shared.zones {
                 m.layoutID = nil
                 log("edited built-in kept as unsaved controls=\(m.controls.count)")

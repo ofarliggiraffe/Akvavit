@@ -3042,9 +3042,9 @@ struct LibraryView: View {
                     Toggle("Extended logging", isOn: $input.diagnostics)
                 } header: { Text("Diagnostics") }
             }
-            if settingsShow("pointer", "mouse", "cursor", "touch", "trackpad", "sensitivity") {
-                Section { LibraryPointerSettings() } header: { Text("Pointer") }
-                    footer: { Text(AkvavitGameControls.settingsFooter) }   // Akvavit: User's defaults
+            // Akvavit: each game type's controls, the global pointer settings among them (User).
+            if settingsShow("controls", "game type", "layout", "pointer", "mouse", "cursor", "touch", "trackpad", "sensitivity") {
+                AkvavitControlsSettingsSection()
             }
             if GraphicsSettings.shown, settingsShow("graphics", "Direct3D", "D3D9", "D3D10", "D3D11", "D3D12", "DXMT", "wined3d",
                                                     "vkd3d", "DXVK", "Vulkan", "MoltenVK", "KosmicKrisp") {

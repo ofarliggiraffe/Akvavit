@@ -191,6 +191,8 @@
 		59BCCC8A03724766F5DAB967 /* PacketTunnelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BDFC7D58F975AC4E6A8EA26 /* PacketTunnelProvider.swift */; };
 		AE3874E49C604B9716BB2D6E /* AkvavitTunnel.appex in Embed */ = {isa = PBXBuildFile; fileRef = 658946959BE7187C94B0CB3E /* AkvavitTunnel.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		83B336D95EA02353F86CCD48 /* AkvavitGameControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1C1ADFE2ED9D006BED4F524 /* AkvavitGameControls.swift */; };
+		A39A82440EEDF9E19A5394A2 /* AkvavitControlsSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CE07D75AEC0E0E1D4777D6A /* AkvavitControlsSettings.swift */; };
+		C2A3644BE943A1F7CDA04D13 /* AkvavitLayoutEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5B64A0DDAEAD489E0B8EE73 /* AkvavitLayoutEditor.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -439,6 +441,8 @@
 		3E604B5DEA0047FD73F5C43A /* AkvavitTunnel.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = "AkvavitTunnel.entitlements"; path = "../akvavit/Tunnel/AkvavitTunnel.entitlements"; sourceTree = SOURCE_ROOT; };
 		658946959BE7187C94B0CB3E /* AkvavitTunnel.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = AkvavitTunnel.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		E1C1ADFE2ED9D006BED4F524 /* AkvavitGameControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "AkvavitGameControls.swift"; path = "../akvavit/App/AkvavitGameControls.swift"; sourceTree = SOURCE_ROOT; };
+		1CE07D75AEC0E0E1D4777D6A /* AkvavitControlsSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "AkvavitControlsSettings.swift"; path = "../akvavit/App/AkvavitControlsSettings.swift"; sourceTree = SOURCE_ROOT; };
+		C5B64A0DDAEAD489E0B8EE73 /* AkvavitLayoutEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "AkvavitLayoutEditor.swift"; path = "../akvavit/App/AkvavitLayoutEditor.swift"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -739,6 +743,8 @@
 		7115A7D2CFB920A7816DDCA2 /* Akvavit */ = {
 			isa = PBXGroup;
 			children = (
+				C5B64A0DDAEAD489E0B8EE73 /* AkvavitLayoutEditor.swift */,
+				1CE07D75AEC0E0E1D4777D6A /* AkvavitControlsSettings.swift */,
 				E1C1ADFE2ED9D006BED4F524 /* AkvavitGameControls.swift */,
 				3E604B5DEA0047FD73F5C43A /* AkvavitTunnel.entitlements */,
 				404E2964D0E033ED1D0ECF1B /* Info.plist */,
@@ -931,6 +937,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C2A3644BE943A1F7CDA04D13 /* AkvavitLayoutEditor.swift in Sources */,
+				A39A82440EEDF9E19A5394A2 /* AkvavitControlsSettings.swift in Sources */,
 				83B336D95EA02353F86CCD48 /* AkvavitGameControls.swift in Sources */,
 				266DC10CC4C95AF77338064C /* AkvavitTunnel.swift in Sources */,
 				87508E203E1101C960173614 /* AkvavitSteamPoll.swift in Sources */,
