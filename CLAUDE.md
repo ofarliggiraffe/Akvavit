@@ -302,27 +302,63 @@ through Dock at 60 FPS, RT2, Portal).
     doesn't write its file (`holdsInputFile`). `finish()` brings the global
     values back.
   - Madeira's touch layout was already per game (`LibraryEntry.controls`).
-  - Planned:
-    - a settings page to edit each type's defaults from a game's settings;
-    - a Strategy layout;
-    - the type chosen automatically from Steam's genres.
-  - The in-game menu stays per game only.
+    Games also store their layout only when it differs from the type's.
+  - **Settings › Controls** (`AkvavitControlsSettings.swift`, in place of
+    Settings › Pointer):
+    - Layouts: Madeira's named layouts (`ControlPresetsModel`; its
+      `change(_:)` is our hook for saving). New, edit, rename (delete + save
+      under the same id), duplicate, delete.
+    - Built-in layouts can be edited too. Their edits are kept in
+      `Documents/akvavit-builtin-layouts.json` (`AkvavitBuiltInLayouts`) and
+      laid over `ControlPresetStore.builtIns`, which is computed now. Reset
+      removes them.
+    - User, Strategy, FPS: pointer settings, which layout, whether the
+      controls show (`Documents/akvavit-control-defaults.json`).
+  - **The editor outside a game** (`AkvavitLayoutEditor.swift`) is Madeira's
+    in-game editor on the shared working copy, set aside and restored
+    afterwards. `TouchControlsOverlay` draws it in either orientation, over
+    `AkvavitEditorBackdrop`.
+  - **Nothing in a game changes the defaults or the named layouts.** Madeira's
+    `editingEnded` would write a game's edit back into its named layout;
+    `editsStayWithGame` makes it the game's own copy instead (except a layout
+    just created empty).
+  - Planned: a Strategy layout, and the type chosen automatically from
+    Steam's genres.
 - Madeira's host test `tests/host/check-control-presets.py` compiles part of
-  `TouchControlPresets.swift`, so it carries a stub for `AkvavitGameControls`.
-  Three host tests (`check-jit-method`, `check-onboarding`,
-  `check-jit-network`) fail since our signing, setup-screen and tunnel
-  commits; they still expect Madeira's originals. `check-dock-contract`
-  fails on Madeira's base too.
-- **Rare crash on loading (seen once, RT2 through Dock, 2026-10-31):** the
-  game is killed with `c0000005`:
-  - `NtReadFile` → `virtual_check_buffer_for_write` faults on a buffer in
-    memory Wine has no view of ("NO wine view");
-  - the fault isn't caught on iOS ("Exception frame is not in stack
-    limits");
-  - Madeira then says "Madeira Dock exited before a game window appeared",
+  `TouchControlPresets.swift`, so it carries stubs for `AkvavitGameControls`
+  and `AkvavitBuiltInLayouts`. Three host tests (`check-jit-method`,
+  `check-onboarding`, `check-jit-network`) fail since our signing,
+  setup-screen and tunnel commits; they still expect Madeira's originals.
+  `check-dock-contract` fails on Madeira's base too.
+- **Every Wine process runs in the one app process, so Wine's static state in
+  the unix side is shared between processes** (RT2 and the Steam client
+  through Dock, for example). State that upstream Wine keeps per process
+  needs a per-process key here (the process id in the TEB).
+  - Found 2026-10-31: the directory listing cache in `ntdll/unix/file.c`
+    (`dir_data_cache`). The server numbers its entries per process. With one
+    shared array, Steam closing a directory freed the listing RT2 was in, and
+    RT2's `FindNextFile` started over. RT2 listed its maps twice and overran
+    its scenario buffer: about half of its starts crashed, at random, with
+    `c0000005` at `0045E5E8`. Fixed in our Wine (`ios_process_dir_cache`).
+    Madeira then says "Madeira Dock exited before a game window appeared",
     although the window had appeared.
-
-  The next start worked. Not investigated further.
+  - Look for more such state when a problem only shows with another Wine
+    process running alongside.
+- **How that bug was found** (useful for similar ones):
+  - `env.MADEIRA_VALLOC_LOG_ALL = 1` in `madeira.cfg` logs a 32-bit program's
+    allocations (`[valloc]`, `[vfree]`), capped at 3000 lines each.
+  - A temporary `ERR` in `NtReadFile` with the path (`fcntl(F_GETPATH)`)
+    showed what the game read; comparing a good and a crashing run read by
+    read found where they parted. Wine's `ERR` on the unix side doesn't
+    understand `%I64x`.
+  - `build/wine-i386/build.sh <module>` rebuilds one 32-bit DLL (30 s).
+  - Ruled out on the way: settings file, memory ordering (FEX TSO switches),
+    CPU count, audio, junk folders, the app build.
+- FEX's 32-bit side creates an empty `unix/var/mobile/Containers/Data/
+  Application/<id>/Documents/wine/.config/fex-emu/AppConfig` tree in the
+  working directory of a 32-bit program (the game's folder) at each app
+  install. Harmless, but untidy; not fixed yet (FEX stays untouched; a valid
+  config path from outside would be the way).
 
 ## Build gotchas
 
