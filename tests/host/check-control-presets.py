@@ -208,6 +208,9 @@ with tempfile.TemporaryDirectory(prefix='madeira-presets-') as tmp:
     # CoreGraphics where it exists: on macOS, Foundation alone no longer gives CGRect
     # its members (midX, width, ...); Linux's Foundation still does.
     header = 'import Foundation\n#if canImport(CoreGraphics)\nimport CoreGraphics\n#endif\n'
+    # Akvavit: ControlPresetStore.builtIns also lists Akvavit's layouts
+    # (akvavit/App/AkvavitGameControls.swift), which this test leaves out.
+    header += 'enum AkvavitGameControls { static let builtInPresets: [ControlPreset] = [] }\n'
     src.write_text(header + actions + pure_touch + pure + tests)
     subprocess.run([os.environ.get('SWIFTC', 'swiftc'), str(src), '-o', str(exe)], check=True)
     subprocess.run([str(exe)], check=True)

@@ -190,6 +190,7 @@
 		266DC10CC4C95AF77338064C /* AkvavitTunnel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 880F1CFCC175B3CB4D053CAB /* AkvavitTunnel.swift */; };
 		59BCCC8A03724766F5DAB967 /* PacketTunnelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BDFC7D58F975AC4E6A8EA26 /* PacketTunnelProvider.swift */; };
 		AE3874E49C604B9716BB2D6E /* AkvavitTunnel.appex in Embed */ = {isa = PBXBuildFile; fileRef = 658946959BE7187C94B0CB3E /* AkvavitTunnel.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		83B336D95EA02353F86CCD48 /* AkvavitGameControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1C1ADFE2ED9D006BED4F524 /* AkvavitGameControls.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -437,6 +438,7 @@
 		404E2964D0E033ED1D0ECF1B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "Info.plist"; path = "../akvavit/Tunnel/Info.plist"; sourceTree = SOURCE_ROOT; };
 		3E604B5DEA0047FD73F5C43A /* AkvavitTunnel.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = "AkvavitTunnel.entitlements"; path = "../akvavit/Tunnel/AkvavitTunnel.entitlements"; sourceTree = SOURCE_ROOT; };
 		658946959BE7187C94B0CB3E /* AkvavitTunnel.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = AkvavitTunnel.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		E1C1ADFE2ED9D006BED4F524 /* AkvavitGameControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "AkvavitGameControls.swift"; path = "../akvavit/App/AkvavitGameControls.swift"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -737,6 +739,7 @@
 		7115A7D2CFB920A7816DDCA2 /* Akvavit */ = {
 			isa = PBXGroup;
 			children = (
+				E1C1ADFE2ED9D006BED4F524 /* AkvavitGameControls.swift */,
 				3E604B5DEA0047FD73F5C43A /* AkvavitTunnel.entitlements */,
 				404E2964D0E033ED1D0ECF1B /* Info.plist */,
 				7BDFC7D58F975AC4E6A8EA26 /* PacketTunnelProvider.swift */,
@@ -928,6 +931,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				83B336D95EA02353F86CCD48 /* AkvavitGameControls.swift in Sources */,
 				266DC10CC4C95AF77338064C /* AkvavitTunnel.swift in Sources */,
 				87508E203E1101C960173614 /* AkvavitSteamPoll.swift in Sources */,
 				83BDF59E637A23F05ACE0B4B /* AkvavitSetup.swift in Sources */,

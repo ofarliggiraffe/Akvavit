@@ -288,6 +288,41 @@ through Dock at 60 FPS, RT2, Portal).
   0.25 s hold) is a left-button drag from the original point, so RTS box
   selection works. A two- or three-finger tap is a right or middle click, and
   a two-finger drag is the wheel (`ContentView.swift`, `touchMode*`).
+- **Game type and per-game controls** (`akvavit/App/AkvavitGameControls.swift`):
+  - Each library game has a type: User (default, `gameType` nil), Strategy
+    or FPS. Each type has defaults: pointer mode, sensitivities, and an
+    on-screen layout (FPS: the built-in "FPS keyboard & mouse",
+    `builtin.akvavit.fps`).
+  - User's defaults are the global `InputSettings` (`madeira-input.json`,
+    Settings › Pointer) and the shared layout.
+  - A game stores only pointer values that differ from its type's defaults
+    (`pointerMode`, `sensAbs`, `sensRel`). Choosing a type resets the game's
+    pointer and layout.
+  - During a library session `InputSettings` holds the game's values and
+    doesn't write its file (`holdsInputFile`). `finish()` brings the global
+    values back.
+  - Madeira's touch layout was already per game (`LibraryEntry.controls`).
+  - Planned:
+    - a settings page to edit each type's defaults from a game's settings;
+    - a Strategy layout;
+    - the type chosen automatically from Steam's genres.
+  - The in-game menu stays per game only.
+- Madeira's host test `tests/host/check-control-presets.py` compiles part of
+  `TouchControlPresets.swift`, so it carries a stub for `AkvavitGameControls`.
+  Three host tests (`check-jit-method`, `check-onboarding`,
+  `check-jit-network`) fail since our signing, setup-screen and tunnel
+  commits; they still expect Madeira's originals. `check-dock-contract`
+  fails on Madeira's base too.
+- **Rare crash on loading (seen once, RT2 through Dock, 2026-10-31):** the
+  game is killed with `c0000005`:
+  - `NtReadFile` → `virtual_check_buffer_for_write` faults on a buffer in
+    memory Wine has no view of ("NO wine view");
+  - the fault isn't caught on iOS ("Exception frame is not in stack
+    limits");
+  - Madeira then says "Madeira Dock exited before a game window appeared",
+    although the window had appeared.
+
+  The next start worked. Not investigated further.
 
 ## Build gotchas
 

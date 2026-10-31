@@ -235,7 +235,7 @@ struct ControlPresetStore: Equatable {
     static let builtIns: [ControlPreset] = [
         ControlPreset(id: ControlPresetLayout.xboxID, name: ControlPresetLayout.xboxName,
                       controls: ControlPresetLayout.xbox(for: .referencePhone)),
-    ]
+    ] + AkvavitGameControls.builtInPresets   // Akvavit: the FPS layout
     static let maxNameLength = 40
 
     private(set) var user: [ControlPreset] = []

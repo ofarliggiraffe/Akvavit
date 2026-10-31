@@ -206,6 +206,12 @@ struct LibraryEntry: Codable, Identifiable {
     var controlLayout: String?
     /// The game's gesture zones (GestureZones.swift), kept with its controls. Older files have none.
     var zones: [GestureZone]?
+    /// Akvavit: the game type ("strategy", "fps"; nil = User) and the pointer
+    /// settings that differ from its defaults (AkvavitGameControls.swift).
+    var gameType: String?
+    var pointerMode: String?
+    var sensAbs: Double?
+    var sensRel: Double?
     var lastPlayed: Date?
     var graphicsAPI: String?
     var folderBytes: Int64?
@@ -1363,6 +1369,7 @@ final class LibraryModel: ObservableObject {
         }
         controls.visible = entry.touchControls
         controls.sizeScale = min(max(entry.controlSize ?? 1, 0.5), 2)
+        AkvavitGameControls.begin(entry)   // Akvavit: the game's pointer settings, its type's layout
         controllerBinds = GamepadInput.keyboardMouseAvailable ? (entry.controllerBinds ?? [:]) : [:]
         padMouseVertical = GamepadInput.keyboardMouseAvailable ? (entry.padMouseVertical ?? 1) : 1
         controllerMode = GamepadInput.keyboardMouseAvailable ? entry.controllerMode : nil
@@ -1521,6 +1528,7 @@ final class LibraryModel: ObservableObject {
             // The in-game Aspect & scaling choice sticks to the game. MADEIRA_SESSION_TOOLS=0
             // hides that picker and leaves the stored choice alone.
             if MadeiraConfig.flag("MADEIRA_SESSION_TOOLS") { entry.display = displayMode.rawValue }
+            AkvavitGameControls.save(into: &entry)   // Akvavit: the game's own pointer settings
             save(entry)
         }
     }
@@ -1537,6 +1545,7 @@ final class LibraryModel: ObservableObject {
         controls.controls = savedControls; controls.visible = savedVisible; controls.sizeScale = savedSize
         GestureZonesModel.shared.selected = nil; GestureZonesModel.shared.zones = savedZones
         if ControlPresetsModel.enabled { controls.layoutID = savedLayout }
+        AkvavitGameControls.end()   // Akvavit: the global pointer settings come back
         current = nil; activeEntry = nil; menu = false; sessionMessage = ""
         quitRequestedAt = nil; forceCloseOffered = false; dockGameEnded = false; dockGameEndedAt = nil
         displayMode = .fit
@@ -3034,7 +3043,8 @@ struct LibraryView: View {
                 } header: { Text("Diagnostics") }
             }
             if settingsShow("pointer", "mouse", "cursor", "touch", "trackpad", "sensitivity") {
-                Section("Pointer") { LibraryPointerSettings() }
+                Section { LibraryPointerSettings() } header: { Text("Pointer") }
+                    footer: { Text(AkvavitGameControls.settingsFooter) }   // Akvavit: User's defaults
             }
             if GraphicsSettings.shown, settingsShow("graphics", "Direct3D", "D3D9", "D3D10", "D3D11", "D3D12", "DXMT", "wined3d",
                                                     "vkd3d", "DXVK", "Vulkan", "MoltenVK", "KosmicKrisp") {
@@ -3627,6 +3637,7 @@ struct LibraryDetail: View {
     }
 
     @ViewBuilder private var controlsPage: some View {
+        AkvavitGameTypeSection(entry: $entry)   // Akvavit: the game type
         Section("On screen") {
             if GamepadInput.keyboardMouseAvailable {
                 ControllerModeChoice(mode: $entry.controllerMode)

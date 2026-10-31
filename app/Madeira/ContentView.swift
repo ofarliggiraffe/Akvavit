@@ -1254,6 +1254,8 @@ final class InputSettings: ObservableObject {
 
     private func save() {
         guard !loading else { return }
+        // Akvavit: a library session holds the game's pointer settings (AkvavitGameControls).
+        guard !AkvavitGameControls.holdsInputFile else { return }
         let j: [String: Any] = ["relative": relative, "sensAbs": sensAbs, "sensRel": sensRel, "diagnostics": diagnostics,
                                 "sensMouse": sensMouse, "ignoreTouchesWithMouse": ignoreTouchesWithMouse,
                                 "padRightStickMouse": padRightStickMouse,
