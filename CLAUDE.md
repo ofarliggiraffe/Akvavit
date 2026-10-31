@@ -106,7 +106,10 @@ through Dock at 60 FPS, RT2, Portal).
 - **Keep Madeira's iOS app** and change it minimally. Rewriting it would bring
   back input and Wine-startup bugs it has already fixed.
 - **FEX stays untouched.** FEX-Emu doesn't accept AI-generated code; don't
-  write FEX code without asking the user.
+  write FEX code without asking the user. A FEX change would live only in our
+  own fork of it, carried across every update. The user would consider it if
+  more games need what only FEX can provide (first case: hardware breakpoints
+  for AoE II DE, see below); raise it then.
 - **JIT, with nothing prebuilt from outside:**
   - our own loopback packet-tunnel extension inside the app, replacing
     LocalDevVPN. The app starts it when enabling JIT and stops it once the
@@ -223,19 +226,48 @@ through Dock at 60 FPS, RT2, Portal).
   → pool <addr>` lines map pool addresses back to DLLs; the copy keeps the
   image layout. Unstripped PE builds for symbols are in
   `wine/build-arm64ec/dlls/<name>/arm64ec-windows/`.
-- **Age of Empires II DE** (64-bit) starts through Dock, then dies with
-  "Unhandled illegal instruction" (0xc000001d) during C runtime start-up.
-  Not a FEX or download problem:
-  - the game calls `0x142b9c21c`, a function whose first 5 bytes are
-    `37 9a a6 3f 48` instead of the prologue its unwind data describes
-    (`48 89 5c 24 08`);
-  - Steam ships it like that (two downloads, chunk checksums verified);
-  - on Windows the game seems to rely on something catching that exception
-    and fixing the code.
-
-  In our run only the game's frame handler saw it and declined. Not
-  investigated further (2026-10-30). Next idea: temporary logging of vectored
-  exception handlers in `ntdll`.
+- **Age of Empires II DE** (64-bit, Steam 813780) is **parked** (2026-10-31): its
+  Arxan protection needs x86 hardware breakpoints, which FEX does not emulate.
+  - Since Steam's redistributables are installed, Steam starts it; it then
+    dies with "Unhandled illegal instruction" (c000001d) at `0x142b9c21c`,
+    whose first bytes are `37 9a a6 3f 48` (Steam ships them so).
+  - 6,407 of the executable's 169,486 functions (`.pdata`) start with an
+    opcode invalid in 64-bit mode: Arxan's encrypted function heads. The file
+    names Arxan ("TAMPER", "ARXAN" among its analytics events). The crash is the
+    first one the game reaches: the C++ initializer right after the CRT's
+    first one calls it.
+  - Ruled out: a stale JIT-pool copy (the PE mapping holds the same bytes,
+    `[rsp-trunc] x86 @rip` vs `[guest-code]`), base relocations (none in
+    `.text`), the dynamic value relocation table (none), the entry point and
+    TLS callbacks (standard MSVC), CEG (no `CheckGuid`).
+  - The game registers a vectored handler (`0x142bfa4d8` → `0x142c07024`,
+    first in line) just before the crash, right after allocating 16 MB RWX.
+    Wine calls it for the c000001d and it declines (0). Disassembled, it acts
+    only on STATUS_BREAKPOINT and STATUS_SINGLE_STEP (the exception code is
+    compared after an XOR with `0x8bc6ab9ad2173b9` and doubling), and reads
+    the context's Dr0-Dr2 and Dr7 (offsets 0x48-0x70). So on Windows a
+    hardware execute breakpoint on each encrypted head raises a single step
+    first, and the handler decrypts the head.
+  - In our session Dr0-Dr7 are all zero at the crash and no debug exception
+    comes before it. The game imports neither Get- nor SetThreadContext (it
+    has `GetProcAddress`, `RaiseException`, and "Unable to get ntdll file
+    version/handle" strings, so it may look up calls or make its own system
+    calls with numbers read from ntdll on disk). Not measured: whether it
+    arms the breakpoints through `NtSetContextThread`/`NtContinue` at all.
+  - A fix needs execute breakpoints: properly in FEX (our rule: no FEX
+    changes without asking; it could be a feature request to FEX), or a narrow
+    Wine-side workaround (record the Dr values a context call sets; turn a
+    fault at an armed address into STATUS_SINGLE_STEP with Dr6), which only
+    works if the arming reaches Wine. Arxan may then fail further checks, and
+    DE is heavy for the device anyway. Worth it only if more games need it.
+  - Other Arxan titles are not necessarily affected (Madeira has recommended
+    settings for Red Dead Redemption 2); protections that only check that the
+    debug registers are zero are fine.
+  - Method, for a similar case: temporary `ERR` lines in
+    `wine/dlls/ntdll/exception.c` (`RtlAddVectoredExceptionHandler`,
+    `call_vectored_handlers` with the context's Dr registers), then
+    `build/wine-pe/build-ntdll.sh` (5 s) and the Xcode build. Then
+    disassemble the handler with `llvm-objdump` from `toolchains/llvm-mingw-*`.
 - **Portal** (Steam, 32-bit, Direct3D 9) runs well through Madeira Dock
   (2026-10-30). Controls: touch as mouse for looking, plus a custom touch
   layout with keys (WASD stick, Space, Ctrl, E) and mouse buttons.
