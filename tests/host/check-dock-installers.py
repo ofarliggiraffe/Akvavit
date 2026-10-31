@@ -89,6 +89,7 @@ require('[dock-reset]' in installers and 'still running' in installers and 'last
 game_src = dock[dock.index('/// A game Steam\'s client has installed'):dock.index('/// Madeira Dock: a small headless host')]
 stubs = r'''
 import Foundation
+@MainActor final class WineMonoModel { static var available: Bool { false } }   // Akvavit: AkvavitInstallScripts.available
 #if canImport(Glibc)
 import Glibc
 #else
@@ -201,9 +202,11 @@ func pe(_ url: URL, machine: UInt16) throws {
         let programs = [vc("vcredist\\2013", "x86 2013"), vc("vcredist\\2015", "x86 2015"),
             vc("vcredist\\2015", "x86 2015"), vc("vcredist\\2022", "x64 2022"), vc("DirectX\\Jun2010", "dxsetup"),
             vc("vcredist\\2019", "game 2019", in: "C:\\Steam\\steamapps\\common\\Fixture Game"),
-            vc("DirectX\\Jun2010", "game dx", in: "C:\\Steam\\steamapps\\common\\Fixture Game")]
-        let supplied = AkvavitInstallScripts.suppliedRuns(programs, available: [.visualCpp14, .directX])
-        require(supplied.map(\.name) == ["x86 2015", "x64 2022", "dxsetup"], "Visual C++ 14 and DirectX from Steamworks Shared count as supplied, once (\(supplied.map(\.name)))")
+            vc("DirectX\\Jun2010", "game dx", in: "C:\\Steam\\steamapps\\common\\Fixture Game"),
+            vc(".NET\\3.5 Client Profile", "3.5 client profile sp1")]
+        let supplied = AkvavitInstallScripts.suppliedRuns(programs, available: [.visualCpp14, .directX, .dotNet])
+        require(supplied.map(\.name) == ["x86 2015", "x64 2022", "dxsetup", "3.5 client profile sp1"], "Visual C++ 14, DirectX and .NET from Steamworks Shared count as supplied, once (\(supplied.map(\.name)))")
+        require(AkvavitInstallScripts.suppliedRuns(programs, available: [.visualCpp14, .directX]).count == 3, ".NET only with Wine Mono")
         require(AkvavitInstallScripts.suppliedRuns(programs, available: [.directX]).map(\.name) == ["dxsetup"], "only what the build supplies")
         require(AkvavitInstallScripts.suppliedRuns(programs, available: []).isEmpty, "nothing supplied, nothing recorded")
 

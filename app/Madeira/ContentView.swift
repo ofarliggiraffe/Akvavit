@@ -3454,6 +3454,7 @@ struct ContentView: View {
             library.restartNotice = LibraryModel.restartMessage
             return
         }
+        AkvavitSessionLogs.prune()   // Akvavit: ntdll's Dock session logs had no limit
         func fail(_ error: Error) {
             MadeiraDock.cleanup()
             SteamOwnedLibrary.shared.dockEnded()

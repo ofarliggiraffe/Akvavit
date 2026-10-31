@@ -200,6 +200,10 @@ through Dock at 60 FPS, RT2, Portal).
 - `akvavit/scripts/rebuild-wine-unix.sh` rebuilds just Wine's unix side
   (`libntdll_unix.a`, opengl32 included, and `libwin32u_unix.a`) in about
   40 s after a full native build. Then build the app in Xcode.
+- Session logs (`Documents/logs/<exe>-<time>.txt`, hard links to that run's
+  `madeira-log.txt`) are kept to the newest 40. Madeira pruned only on direct
+  starts; Dock starts (ntdll's `madeira_steam_session_log`) now prune too
+  (`AkvavitSessionLogs.swift`). They had grown to 91 files, 155 MB.
 - Symbolicate a crash PC from Madeira's log: load address = the logged
   `unix_call_dispatcher` value minus the offset of
   `___wine_unix_call_dispatcher` in `nm Madeira.debug.dylib`. Then
@@ -302,6 +306,10 @@ through Dock at 60 FPS, RT2, Portal).
     can't work (its 64-bit `infinst.exe` must load at 0x100000000, where iOS
     keeps the app; c0000018). So Steam's Visual C++ 2015+ and DirectX runs
     are recorded as done when the build supplies them (`[akvavit-redist]`).
+    So are Steam's .NET Framework runs (`CommonRedist\.NET\…`) once Wine Mono
+    is installed: Microsoft's .NET installers fail under Wine (1603), and
+    Madeira runs every script in `Steamworks Shared` for every game, so one
+    game's .NET package (Valheim's) hit every game's first start.
     2012 and 2013 still run, and install fine.
   - Visual C++ 14 for 32-bit programs: Wine's own runtime plus Microsoft's
     32-bit MFC, which AoE II HD's launcher imports. Madeira supplies only the

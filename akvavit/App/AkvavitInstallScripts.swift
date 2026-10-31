@@ -26,6 +26,11 @@
 //   in both DLL farms already are what it installs (d3dx9_24-43, d3dx10, d3dx11,
 //   d3dcompiler, XInput, XAudio, XACT). The failed run made every game's first start a
 //   one-time-installs session, and Madeira had to be restarted after it.
+// - .NET Framework (CommonRedist\.NET\<version>) likewise, when Wine Mono is installed (the
+//   .NET runtime Wine runs .NET programs with; WineMono.swift). Microsoft's .NET installers
+//   don't work under Wine (3.5 Client Profile SP1, which Valheim brought, ended with 1603).
+//   Madeira runs every script in Steamworks Shared for every game, so it hit each game's
+//   first start.
 //
 // Hooks in Madeira's DockInstallers.swift, marked "Akvavit:": DockInstallScripts.processes,
 // Results.succeeded and DockInstallers.prepare (recordSupplied).
@@ -41,11 +46,12 @@ enum AkvavitInstallScripts {
     /// The installer found a newer version of its product already installed.
     static func alreadyNewer(_ status: Int) -> Bool { status == 1638 }
 
-    enum Supplied: String { case visualCpp14 = "Visual C++ 14", directX = "DirectX" }
+    enum Supplied: String { case visualCpp14 = "Visual C++ 14", directX = "DirectX", dotNet = ".NET Framework (Wine Mono)" }
 
     /// What a run of Steam's shared redistributables installs, when the app supplies it:
-    /// Visual C++ 14 (CommonRedist\vcredist\<year>, 2015 and later) or DirectX
-    /// (CommonRedist\DirectX\<release>). Runs from a game's own folder are never matched.
+    /// Visual C++ 14 (CommonRedist\vcredist\<year>, 2015 and later), DirectX
+    /// (CommonRedist\DirectX\<release>) or .NET Framework (CommonRedist\.NET\<version>).
+    /// Runs from a game's own folder are never matched.
     static func supplied(_ process: SteamInstallProcess) -> Supplied? {
         guard process.run.hive == .machine,
               process.executable.lowercased().contains("\\steamworks shared\\_commonredist\\") else { return nil }
@@ -53,6 +59,7 @@ enum AkvavitInstallScripts {
         if key.hasPrefix(base + "vcredist\\"), let year = Int(key.dropFirst((base + "vcredist\\").count)), year >= 2015 {
             return .visualCpp14
         }
+        if key.hasPrefix(base + ".net\\") || key.hasPrefix(base + "dotnet\\") { return .dotNet }
         return key.hasPrefix(base + "directx\\") ? .directX : nil
     }
 
@@ -67,19 +74,21 @@ enum AkvavitInstallScripts {
     }
 
     /// What this build supplies: Visual C++ 14 with Microsoft's 32-bit MFC (AkvavitVCRuntime),
-    /// DirectX's redistributable DLLs as Wine builtins in the 32-bit farm.
-    static var available: Set<Supplied> {
+    /// DirectX's redistributable DLLs as Wine builtins in the 32-bit farm, and .NET Framework
+    /// once Wine Mono is installed.
+    @MainActor static var available: Set<Supplied> {
         var result: Set<Supplied> = []
         if AkvavitVCRuntime.suppliesX86 { result.insert(.visualCpp14) }
         if let farm = Bundle.main.resourceURL?.appendingPathComponent("i386-windows/d3dx9_43.dll"),
            FileManager.default.fileExists(atPath: farm.path) { result.insert(.directX) }
+        if WineMonoModel.available { result.insert(.dotNet) }
         return result
     }
 
     /// Records those runs as done, as a finished run records them, before the plan reads the
     /// registry.
-    @MainActor static func recordSupplied(_ found: [SteamInstallProcess], prefix: URL,
-                                          available: Set<Supplied> = AkvavitInstallScripts.available) {
+    @MainActor static func recordSupplied(_ found: [SteamInstallProcess], prefix: URL, available: Set<Supplied>? = nil) {
+        let available = available ?? Self.available
         let runs = suppliedRuns(found, available: available)
         guard !runs.isEmpty else { return }
         do {
