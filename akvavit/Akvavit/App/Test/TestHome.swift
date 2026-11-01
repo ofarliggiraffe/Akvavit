@@ -14,18 +14,19 @@ struct TestHome: View {
             List {
                 Section {
                     NavigationLink {
-                        JITSetupView()
+                        JITSetupView().clearNavigationBackground()
                     } label: {
                         JITStatusRow()
                     }
-                    NavigationLink("Steam") { SteamTestView(showingGame: $showingGame) }
+                    NavigationLink("Steam") { SteamTestView(showingGame: $showingGame).clearNavigationBackground() }
                 }
                 TryOutSection(showingGame: $showingGame)
                 Section {
-                    NavigationLink("About Akvavit") { AboutView() }
+                    NavigationLink("About Akvavit") { AboutView().clearNavigationBackground() }
                 }
             }
             .navigationTitle("Akvavit (test)")
+            .clearNavigationBackground()
         }
         .fullScreenCover(isPresented: $showingGame) { GameScreen() }
     }
@@ -43,5 +44,13 @@ struct JITStatusRow: View {
                     .foregroundStyle(jit.isOn ? .green : .secondary)
             }
         }
+    }
+}
+
+extension View {
+    /// Shows the app's background behind a screen in a navigation stack.
+    func clearNavigationBackground() -> some View {
+        scrollContentBackground(.hidden)
+            .containerBackground(.clear, for: .navigation)
     }
 }

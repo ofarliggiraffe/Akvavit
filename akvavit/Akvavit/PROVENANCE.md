@@ -16,6 +16,8 @@ Written for Akvavit. Where a file stands in for something of Madeira's, it says 
 |---|---|
 | `project.yml` | The project. Its project-level build settings are the values Madeira's project sets, so Madeira's files compile the same way. |
 | `App/AkvavitApp.swift` | The app's entry point. |
+| `App/RootView.swift`, `App/TabColumn.swift`, `App/Theme.swift`, `App/LibraryView.swift`, `App/GameGrid.swift`, `App/CoverView.swift`, `App/GamePopup.swift`, `App/GameInfoFace.swift`, `App/GameSettingsFace.swift` | The interface, as the user designed it (the mockup canvas): tab column, theme, library grid, the game popup with its flip and settings side. |
+| `App/PlaceholderGames.swift` | **Temporary** stand-in games for the flip spike; replaced by AkvavitKit's game list. |
 | `App/Test/*` | **Temporary test screens**, only for checking AkvavitKit on the device. The real interface replaces all of them. |
 | `Kit/Steam.swift` | Sign-in (on SwiftSteam's sign-in model), the account's games, downloads, Valve's client files. **For now it uses Madeira's `MadeiraDock.games` (installed games) and `SteamRuntimeInstaller` (Valve's client files).** |
 | `Kit/Session.swift` | Starting and watching a Windows session: `LaunchConfig` → environment, then the engine's start calls. **For now it uses Madeira's `StikJITHelper` for the JIT pool and the debugger detach.** |
@@ -32,6 +34,13 @@ Written for Akvavit. Where a file stands in for something of Madeira's, it says 
 | `../App/AkvavitTunnel.swift` | Our JIT VPN (also in Madeira's app). |
 | `../App/AkvavitSteamPoll.swift`, `AkvavitSteamRedist.swift`, `AkvavitInstallScripts.swift`, `AkvavitSessionLogs.swift`, `AkvavitVCRuntime.swift` | Our earlier additions to Madeira's app, shared. They are written against Madeira's types (`MadeiraDock`, `LogStore`…) and change with them. |
 | `../Tunnel/*` | The tunnel extension (also in Madeira's app). |
+
+## Third-party files (not Madeira's)
+
+| File | What it is |
+|---|---|
+| `App/Fonts/Quicksand-Variable.ttf` | The Quicksand font, unchanged (Google Fonts' `ofl/quicksand/Quicksand[wght].ttf`, renamed). SIL Open Font License 1.1, Reserved Font Name "Quicksand". |
+| `App/Fonts/Quicksand-OFL.txt` | Its licence. |
 
 ## Madeira's components (kept; may be replaced later)
 

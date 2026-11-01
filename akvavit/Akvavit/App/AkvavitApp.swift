@@ -11,8 +11,7 @@ struct AkvavitApp: App {
 
     var body: some Scene {
         WindowGroup {
-            // Temporary: test screens (Test/) until the real interface exists.
-            TestHome()
+            RootView()
         }
     }
 }

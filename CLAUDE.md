@@ -221,10 +221,14 @@ through Dock at 60 FPS, RT2, Portal).
   - **Madeira's engine-side Swift is compiled in temporarily** (JIT flow,
     Dock helpers, log, config), behind AkvavitKit's API. It is to be replaced
     piece by piece, each checked against the version that works.
-- **The user designs the interface.** Don't design or build real screens.
-  Everything in `App/Test/` is temporary test screens for checking AkvavitKit.
-  The real interface comes later, designed with the user, and is then wired to
-  AkvavitKit. The planned in-game menu holds things like controls and Quit.
+- **The user designs the interface.** Don't design screens on your own; build
+  only what the user has settled (on the design canvas, since 2026-11-01:
+  the tab column, Library, the game popup with its flip and settings side,
+  Get games, setup; Settings as one big card, contents still open).
+  Everything in `App/Test/` is temporary test screens for checking AkvavitKit;
+  the Settings tab holds them until Settings is designed. Not designed yet:
+  Controls, Settings' contents, the in-game menu (controls, Quit), dark-mode
+  colours (placeholders in `App/Theme.swift`).
 - **FEX changes are the user's call** (an earlier note here called FEX
   untouchable; the user never set that rule). Upstream FEX-Emu doesn't accept
   AI-generated code (unverified), which only matters for sending changes
