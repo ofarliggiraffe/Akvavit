@@ -2,10 +2,11 @@
 //
 // The popup's underside: the game's settings. Done tips the card back.
 
+import AkvavitKit
 import SwiftUI
 
 struct GameSettingsFace: View {
-    let game: PlaceholderGame
+    let game: Game
     let layout: PopupLayout
     /// The card's final size.
     let size: CGSize

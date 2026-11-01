@@ -3,11 +3,16 @@
 // The app's one screen: the tab column on the left, the selected tab's content
 // beside it, and the game popup above everything.
 
+import AkvavitKit
 import SwiftUI
 
 struct RootView: View {
     @SceneStorage("tab") private var tab = AppTab.home
     @State private var popup = GamePopupModel()
+
+    private var signedIn: Bool {
+        if case .signedIn = Steam.shared.signIn { true } else { false }
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -30,13 +35,15 @@ struct RootView: View {
         }
         .background { ThemeBackground().ignoresSafeArea() }
         .environment(popup)
+        // Steam's view of the games: at start, and after signing in.
+        .task(id: signedIn) { await Games.shared.refresh() }
     }
 
     @ViewBuilder
     private func content(compact: Bool) -> some View {
         switch tab {
         case .home:
-            LibraryView(compact: compact)
+            LibraryView(compact: compact) { tab = .getGames }
         case .getGames:
             ComingLater(title: "Get games", note: "Comes in a later step.", compact: compact)
         case .controls:

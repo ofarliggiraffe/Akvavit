@@ -10,13 +10,14 @@
 // viewer and turns it with one 3D transform. With Reduce Motion it crossfades.
 
 import QuartzCore
+import AkvavitKit
 import SwiftUI
 
 @MainActor @Observable
 final class GamePopupModel {
     enum Phase { case closed, opening, open, closing }
 
-    private(set) var game: PlaceholderGame?
+    private(set) var game: Game?
     private(set) var phase = Phase.closed
     /// The cover's frame in global coordinates, kept up to date while open.
     var sourceFrame = CGRect.zero
@@ -53,11 +54,11 @@ final class GamePopupModel {
     }
     private static let fade = Animation.easeInOut(duration: 0.3)
 
-    func isShowing(_ game: PlaceholderGame) -> Bool {
+    func isShowing(_ game: Game) -> Bool {
         phase != .closed && self.game?.id == game.id
     }
 
-    func show(_ game: PlaceholderGame, from frame: CGRect, reduceMotion: Bool) {
+    func show(_ game: Game, from frame: CGRect, reduceMotion: Bool) {
         guard phase == .closed else { return }
         generation += 1
         self.game = game
@@ -218,7 +219,9 @@ struct GamePopupLayer: View {
     var body: some View {
         GeometryReader { proxy in
             let layerFrame = proxy.frame(in: .global)
-            if let game = model.game {
+            // The list's current entry: facts that arrive while it is open show.
+            if let shown = model.game {
+                let game = Games.shared.game(shown.id) ?? shown
                 let (target, layout) = PopupLayout.frame(in: proxy.size, safeArea: safeArea)
                 let source = model.sourceFrame.offsetBy(dx: -layerFrame.minX, dy: -layerFrame.minY)
                 ZStack(alignment: .topLeading) {
@@ -247,7 +250,7 @@ struct GamePopupLayer: View {
 private enum Face { case cover, info, settings }
 
 private struct FlipCard: View, Animatable {
-    let game: PlaceholderGame
+    let game: Game
     let source: CGRect
     let target: CGRect
     let layout: PopupLayout
@@ -298,7 +301,7 @@ private struct FlipCard: View, Animatable {
     private func face(_ face: Face, size: CGSize, radius: CGFloat) -> some View {
         switch face {
         case .cover:
-            CoverArt(game: game, titleSize: layout == .wide ? 15 : 12, showsBadge: false)
+            CoverArt(game: game, titleSize: layout == .wide ? 15 : 12, showsBadge: false, loadHeight: target.height)
                 .frame(width: size.width, height: size.height)
                 .clipShape(.rect(cornerRadius: radius))
                 .shadow(color: Theme.shadow.opacity(0.28 + 0.17 * lift), radius: 13 + 17 * lift, y: 12 + 18 * lift)

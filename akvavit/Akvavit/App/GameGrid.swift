@@ -3,10 +3,11 @@
 // Covers in a grid whose columns follow the width. The grid fades out at its
 // top and bottom edges.
 
+import AkvavitKit
 import SwiftUI
 
 struct GameGrid: View {
-    let games: [PlaceholderGame]
+    let games: [Game]
     let compact: Bool
 
     var body: some View {

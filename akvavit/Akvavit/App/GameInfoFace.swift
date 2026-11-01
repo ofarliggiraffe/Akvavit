@@ -3,10 +3,11 @@
 // The popup's info side: the cover, the title, the facts, Play, and below it
 // Game settings and Uninstall (which asks on the card itself).
 
+import AkvavitKit
 import SwiftUI
 
 struct GameInfoFace: View {
-    let game: PlaceholderGame
+    let game: Game
     let layout: PopupLayout
     /// The card's final size.
     let size: CGSize
@@ -74,7 +75,8 @@ struct GameInfoFace: View {
     }
 
     private func cover(width: CGFloat, height: CGFloat, titleSize: CGFloat, radius: CGFloat) -> some View {
-        CoverArt(game: game, titleSize: titleSize, showsBadge: false)
+        // Decoded at the card's height, the same image as the flight's cover.
+        CoverArt(game: game, titleSize: titleSize, showsBadge: false, loadHeight: size.height)
             .frame(width: width, height: height)
             .clipShape(.rect(cornerRadius: radius))
             .shadow(color: Theme.shadow.opacity(0.35), radius: 15, y: 14)
@@ -117,14 +119,14 @@ struct GameInfoFace: View {
 }
 
 private struct FactsRow: View {
-    let game: PlaceholderGame
+    let game: Game
     let compact: Bool
 
     var body: some View {
         HStack(spacing: compact ? 10 : 16) {
-            fact("Playtime", "—")
-            fact("Released", game.released)
-            fact("Size on disk", game.size ?? "—")
+            fact("Playtime", GameFacts.playtime(game.playtimeMinutes))
+            fact("Released", game.releaseYear.map(String.init) ?? "—")
+            fact("Size on disk", GameFacts.size(game.sizeOnDisk))
         }
     }
 
@@ -176,7 +178,7 @@ struct CloseButton: View {
 
 /// Asks before uninstalling, on the card itself.
 private struct UninstallConfirmation: View {
-    let game: PlaceholderGame
+    let game: Game
     let width: CGFloat
     let model: GamePopupModel
 
@@ -189,7 +191,7 @@ private struct UninstallConfirmation: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Uninstall \(game.name)?")
                     .font(.quicksand(20, .bold, relativeTo: .title3))
-                Text((game.size.map { "This deletes its \($0) of game files." } ?? "This deletes its game files.")
+                Text((game.sizeOnDisk.map { "This deletes its \(GameFacts.size($0)) of game files." } ?? "This deletes its game files.")
                      + " You can install it again from Get games.")
                 HStack(spacing: 10) {
                     Button("Cancel") { model.confirmingUninstall = false }
@@ -250,5 +252,23 @@ struct OutlineButtonStyle: ButtonStyle {
                     .strokeBorder(destructive ? Theme.destructiveOutline : Theme.outline, lineWidth: 2)
             }
             .opacity(configuration.isPressed ? 0.6 : 1)
+    }
+}
+
+/// Facts about a game, in words.
+enum GameFacts {
+    static func playtime(_ minutes: Int?) -> String {
+        guard let minutes else { return "—" }
+        switch minutes {
+        case 0: return "None"
+        case ..<60: return "\(minutes) min"
+        case ..<600: return (Double(minutes) / 60).formatted(.number.precision(.fractionLength(0...1))) + " h"
+        default: return "\(minutes / 60) h"
+        }
+    }
+
+    static func size(_ bytes: Int64?) -> String {
+        guard let bytes else { return "—" }
+        return ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
     }
 }

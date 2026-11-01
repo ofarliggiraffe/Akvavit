@@ -37,7 +37,7 @@ public final class Steam {
     private var revision = 0
     @ObservationIgnored private var watcher: AnyCancellable?
 
-    @ObservationIgnored private let session = SteamSession()
+    @ObservationIgnored let session = SteamSession()
     @ObservationIgnored private lazy var fetcher = SteamLibraryFetcher(session: session)
     @ObservationIgnored private lazy var downloader = DepotDownloader(session: session)
     @ObservationIgnored private var downloadTasks: [Int: Task<Void, Never>] = [:]
@@ -84,6 +84,7 @@ public final class Steam {
     public func signOut() {
         SteamSignInModel.shared.signOut()
         games = []
+        Games.shared.forgetAccount()
     }
 
     // MARK: Games
@@ -111,6 +112,13 @@ public final class Steam {
         }
     }
 
+    /// The account's playable apps with their product info (names, artwork,
+    /// depots), for the game list.
+    func ownedApps() async throws -> [SteamAppInfo] {
+        try await session.ensureConnected()
+        return try await fetcher.fetchOwnedApps()
+    }
+
     /// Games with an install record in the prefix's Steam library: what Dock can start.
     private func installedIDs() -> Set<Int> {
         Set(MadeiraDock.games(drive: MadeiraDock.drive).filter(\.installed).map(\.id))
@@ -119,6 +127,49 @@ public final class Steam {
     private func refreshInstalled() {
         let installed = installedIDs()
         for index in games.indices { games[index].installed = installed.contains(games[index].id) }
+        Games.shared.reloadInstalled()
+    }
+
+    // MARK: Uninstall
+
+    public enum UninstallError: LocalizedError {
+        case windowsRan
+        case notInstalled
+
+        public var errorDescription: String? {
+            switch self {
+            case .windowsRan: "Windows has run since Akvavit started and may still use the game's files. Close Akvavit, open it again, then uninstall."
+            case .notInstalled: "The game isn't installed."
+            }
+        }
+    }
+
+    /// Deletes an installed game: its folder and its install records. A
+    /// download of it stops first. Not after a session has run in this app
+    /// run: Wine's processes may still hold the files.
+    public func uninstall(_ appID: Int) async throws {
+        guard !Session.shared.needsRestart else { throw UninstallError.windowsRan }
+        if let task = downloadTasks[appID] {
+            task.cancel()
+            await task.value
+        }
+        let drive = MadeiraDock.drive
+        guard let game = MadeiraDock.games(drive: drive).first(where: { $0.id == appID }) else {
+            throw UninstallError.notInstalled
+        }
+        let steamApps = drive.appendingPathComponent(game.library, isDirectory: true)
+        SteamLog.event("[akvavit-steam] uninstall app=\(appID)")
+        try await Task.detached(priority: .userInitiated) {
+            try SteamInstallFiles.delete(appID: appID, folderName: game.installDir, steamApps: steamApps)
+        }.value
+        // A reinstall starts with no one-time install choices left from before.
+        var ledger = DockInstallLedger.load(prefix: MadeiraDock.prefix)
+        ledger.runNext[String(appID)] = nil
+        ledger.setUnfinished(appID, [])
+        ledger.setRequest(appID, nil)
+        try? ledger.save(prefix: MadeiraDock.prefix)
+        downloads[appID] = nil
+        refreshInstalled()
     }
 
     // MARK: Downloads

@@ -2,18 +2,32 @@
 //
 // Home: the installed games, from every source.
 
+import AkvavitKit
 import SwiftUI
 
 struct LibraryView: View {
     let compact: Bool
-    // Step 2 replaces these with the installed games.
-    private let games = PlaceholderGame.library
+    let showGetGames: () -> Void
+    private let games = Games.shared
 
     var body: some View {
+        let library = games.library
         VStack(alignment: .leading, spacing: 0) {
-            TabTitle("Library", detail: games.count == 1 ? "1 game" : "\(games.count) games",
+            TabTitle("Library", detail: library.count == 1 ? "1 game" : "\(library.count) games",
                      compact: compact)
-            GameGrid(games: games, compact: compact)
+            if library.isEmpty {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Games you install show up here.")
+                        .font(.quicksand(17, .semibold, relativeTo: .body))
+                        .foregroundStyle(Theme.secondaryText)
+                    Button("Get games", action: showGetGames)
+                        .buttonStyle(FilledButtonStyle(color: Theme.getGamesColors.tint, height: 48, fontSize: 17))
+                        .frame(maxWidth: 220)
+                }
+                .padding(.top, 20)
+            } else {
+                GameGrid(games: library, compact: compact)
+            }
         }
     }
 }
