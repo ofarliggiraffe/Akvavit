@@ -13,6 +13,9 @@ struct TestHome: View {
         NavigationStack {
             List {
                 Section {
+                    Button("Run setup again") { SetupFlow.shared.runAgain() }
+                }
+                Section {
                     NavigationLink {
                         JITSetupView().clearNavigationBackground()
                     } label: {

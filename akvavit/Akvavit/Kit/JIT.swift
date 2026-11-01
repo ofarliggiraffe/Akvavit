@@ -90,6 +90,18 @@ public final class JIT {
         JITCoordinator.shared.prepareBuiltIn()
     }
 
+    /// Runs the setup check and returns when it has finished: nil when it
+    /// passed, otherwise what went wrong.
+    public func runCheck() async -> String? {
+        checkSetup()
+        // `busy` is set as the check starts; an early failure leaves it unset.
+        while JITCoordinator.shared.busy {
+            try? await Task.sleep(for: .milliseconds(200))
+        }
+        revision &+= 1
+        return JITCoordinator.shared.error
+    }
+
     public func refresh() {
         JITCoordinator.shared.refreshPairingStatus()
         AkvavitTunnel.shared.refresh()

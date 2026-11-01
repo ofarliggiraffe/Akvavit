@@ -31,6 +31,11 @@ enum Theme {
     static let chipBackground = Color(light: 0xFFFFFF, dark: 0xFFFFFF, alpha: 0.55, darkAlpha: 0.08)
     static let chipBorder = Color(light: 0x20243A, dark: 0xFFFFFF, alpha: 0.12, darkAlpha: 0.16)
 
+    // Setup
+    static let success = Color(light: 0x2F8F4E, dark: 0x4CC06E)
+    static let link = Color(light: 0x3B4FB0, dark: 0x9FB2FF)
+    static let fieldOnCard = Color(light: 0xFFFFFF, dark: 0xFFFFFF, alpha: 1, darkAlpha: 0.08)
+
     // Download marks on covers
     static let failed = Color(hex: 0xD93A30)
 

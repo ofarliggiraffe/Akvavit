@@ -122,11 +122,27 @@ Both can be installed side by side. See "Akvavit's own app" below.
 - **AkvavitKit's public API**, which the interface uses:
   - `AkvavitEngine.start()`;
   - `JIT` (pairing, VPN, check, enable);
-  - `Session` with `LaunchConfig` (`.direct`, `.desktop`, `.steam(appID:)`),
-    plus `quit()`;
-  - `Steam` (sign-in, games, downloads, Valve's client files);
+  - `Session` with `LaunchConfig` (`.direct`, `.desktop`, `.steam(appID:)`;
+    `LaunchConfig(game:settings:fitting:)`), plus `quit()`;
+  - `Steam` (sign-in, downloads with a queue and cancel-with-cleanup,
+    uninstall, Valve's client files);
+  - `Games` (one list, `steam:<id>`: installed games from the install
+    records, offline, cached in Application Support; owned games, release
+    years and playtime from Steam), `Covers` (Steam's CDN, disk cache,
+    downsampled);
+  - `GameSettingsStore` (per game: x87 on by default, screen size, controls);
+  - `SetupFlow` (first-start setup, its JIT chain);
   - `GameSurfaceView` (picture and touch as mouse);
   - `GameOverlay` (interface above the picture).
+- **Background downloads** (`Kit/DownloadActivity.swift`): one
+  `BGContinuedProcessingTask` (iOS 26, so AkvavitKit targets 26) for the
+  download queue, requested at the Install tap, identifier
+  `<bundle ID>.download.<unique>`, registered just before submitting. iOS
+  draws its Live Activity; the app gives only title, subtitle and progress.
+  iOS ends tasks whose progress looks stuck: progress only grows, in whole
+  percent, and the text changes only with the step. It stayed expanded in the
+  Dynamic Island on the Duo (flicking it small works); there is no API for
+  that. Apple has acknowledged that these tasks pause on a locked device.
 - **Build and install:** open `akvavit/Akvavit/Akvavit.xcodeproj` in the user's
   Xcode window (not one the tools open in the background: that one has no
   Apple account and falls back to the wildcard profile). Scheme `Akvavit`,

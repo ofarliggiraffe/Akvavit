@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // The app's one screen: the tab column on the left, the selected tab's content
-// beside it, and the game popup above everything.
+// beside it, the game popup above them, and setup above everything on first
+// start (or when run again from Settings).
 
 import AkvavitKit
 import SwiftUI
@@ -15,6 +16,20 @@ struct RootView: View {
     }
 
     var body: some View {
+        ZStack {
+            main
+            // Outside `main`, which ignores the keyboard: setup's card makes room for it.
+            if !SetupFlow.shared.isDone {
+                SetupView()
+            }
+        }
+        .background { ThemeBackground().ignoresSafeArea() }
+        .onChange(of: SetupFlow.shared.isDone) { _, done in
+            if !done { tab = .home }
+        }
+    }
+
+    private var main: some View {
         GeometryReader { proxy in
             let insets = proxy.safeAreaInsets
             // The outer display is narrow; the inner one, unfolded, is not.
@@ -34,7 +49,6 @@ struct RootView: View {
             .onChange(of: proxy.size) { popup.layoutChanged() }
         }
         .ignoresSafeArea(.keyboard)
-        .background { ThemeBackground().ignoresSafeArea() }
         .environment(popup)
         // Steam's view of the games: at start, and after signing in.
         .task(id: signedIn) { await Games.shared.refresh() }
