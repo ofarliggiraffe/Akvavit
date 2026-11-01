@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // The screen a session runs on: the picture over the whole display, touches as
-// the mouse. While it starts, and after it ends, a status shows instead.
+// the mouse, the chosen controls over it. While it starts, and after it ends,
+// a status shows instead.
 
 import AkvavitKit
 import SwiftUI
@@ -10,21 +11,42 @@ struct GameSurface: UIViewRepresentable {
     func makeUIView(context: Context) -> GameSurfaceView {
         let view = GameSurfaceView()
         // Test only: four fingers open the test menu over the game.
-        view.onFourFingerTap = { GameOverlay.show(UIHostingController(rootView: TestGameMenu())) }
+        view.onFourFingerTap = { ControlsOverlay.shared.showMenu() }
         return view
     }
     func updateUIView(_ view: GameSurfaceView, context: Context) {}
 }
 
-/// TEMPORARY in-game test menu, shown in the overlay window above the game.
+/// TEMPORARY in-game test menu, shown over the controls above the game. It
+/// also chooses the controls' layout until games choose theirs.
 struct TestGameMenu: View {
+    let close: () -> Void
+    private let store = ControlLayoutStore.shared
+    private let runtime = ControlsRuntime.shared
+
     var body: some View {
-        VStack(spacing: 12) {
-            Text("Test menu").font(.headline)
-            Button("Back to game") { GameOverlay.hide() }
-                .buttonStyle(.bordered)
-            Button("Quit (closes Akvavit)", role: .destructive) { Session.shared.quit() }
-                .buttonStyle(.borderedProminent)
+        HStack(alignment: .top, spacing: 24) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Controls").font(.headline)
+                ForEach(store.all) { layout in
+                    Button { TestLayoutChoice.choose(layout) } label: {
+                        HStack {
+                            Text(layout.name)
+                            Spacer()
+                            if runtime.layout?.id == layout.id { Image(systemName: "checkmark") }
+                        }
+                        .frame(width: 220)
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+            VStack(spacing: 12) {
+                Text("Test menu").font(.headline)
+                Button("Back to game", action: close)
+                    .buttonStyle(.bordered)
+                Button("Quit (closes Akvavit)", role: .destructive) { Session.shared.quit() }
+                    .buttonStyle(.borderedProminent)
+            }
         }
         .padding(24)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
@@ -69,6 +91,13 @@ struct GameScreen: View {
         }
         .statusBarHidden()
         .persistentSystemOverlays(.hidden)
+        .onChange(of: session.state, initial: true) { _, state in
+            switch state {
+            case .running: ControlsOverlay.shared.show()
+            case .ended: ControlsOverlay.shared.hide()
+            case .idle, .starting: break
+            }
+        }
     }
 }
 

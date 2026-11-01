@@ -39,6 +39,11 @@ public enum GameOverlay {
         window = overlay
     }
 
+    /// Changes which touches the overlay takes, keeping what it shows.
+    public static func setTouches(_ touches: Touches) {
+        window?.touches = touches
+    }
+
     public static func hide() {
         window?.isHidden = true
         window?.rootViewController = nil

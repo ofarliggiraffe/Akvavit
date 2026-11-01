@@ -272,6 +272,9 @@ through Dock at 60 FPS, RT2, Portal).
   from source, bundled and applied per game by the app. No manual steps after
   install. dgVoodoo2 is out, because it is closed source.
 - **Full Duo support:** resize on fold and unfold, and move between displays.
+- **Every iPhone and iPad** (the user, 2026-11-01): the interface, and the
+  on-screen controls' layouts, are designed for all iPhone and iPad sizes, not
+  only the Duo.
 - **Steam sign-in** is acceptable after reviewing Madeira's Steam code.
   Reviewed 2026-10-30 (commit c2c1b03), no concerns:
   - the password is RSA-encrypted with Steam's key and sent only to

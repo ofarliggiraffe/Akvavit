@@ -188,8 +188,15 @@ public final class GameSurfaceView: UIView {
     }
 
     private func send(_ point: CGPoint, _ flags: UInt32, data: UInt32 = 0) {
+        // A control layout can leave the game without touch (shooters); four
+        // fingers still open the menu.
+        let controls = ControlsRuntime.shared
+        guard controls.touchAsMouse else { return }
         let (x, y) = windowsPoint(point)
         winios_pointer(x, y, flags | MouseFlags.absolute | MouseFlags.move, data)
+        if flags & (MouseFlags.leftUp | MouseFlags.rightUp | MouseFlags.middleUp) != 0 {
+            controls.mouseButtonReleased()
+        }
     }
 
     /// One line per gesture in the session log (stderr goes to madeira-log.txt).
