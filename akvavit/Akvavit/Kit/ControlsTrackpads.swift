@@ -41,7 +41,8 @@ extension ControlsRuntime {
     /// Aim: mouse counts per point of finger travel, at speed 1.
     private static let aimGain: CGFloat = 6
     /// Move: how far the finger goes before a direction counts, and how close
-    /// to where it landed it has to come back to let go.
+    /// to where it landed it has to come back to let go, at speed 1 (a higher
+    /// speed takes less).
     private static let moveDeadZone: CGFloat = 14
     private static let moveRelease: CGFloat = 10
     /// The keys for each direction, right first, anticlockwise.
@@ -162,8 +163,9 @@ extension ControlsRuntime {
 
     /// Move: the direction from where the finger landed.
     private func steer(_ fingers: TrackpadFingers, to point: CGPoint) {
+        let speed = CGFloat(max(fingers.pad.speed, 0.25))
         let direction = Self.direction(point.x - fingers.origin.x, fingers.origin.y - point.y, held: fingers.direction,
-                                       enter: Self.moveDeadZone, leave: Self.moveRelease)
+                                       enter: Self.moveDeadZone / speed, leave: Self.moveRelease / speed)
         guard direction != fingers.direction else { return }
         fingers.direction = direction
         setKeys(&fingers.keys, direction.map { Self.wasd[$0] } ?? [])

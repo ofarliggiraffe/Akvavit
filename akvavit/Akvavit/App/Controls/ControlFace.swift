@@ -92,9 +92,14 @@ struct ButtonFace: View {
                                          style: .continuous)
             ZStack {
                 if latched {
+                    // Sticky and Hold stay lit and pulse until they let go.
                     shape.inset(by: -6).stroke(ControlColors.glow, lineWidth: 3).opacity(label)
+                    PulseRing(shape: shape.inset(by: -6)).opacity(label)
                 }
-                shape.fill(ControlColors.fill(button.colour, down: pressed || latched)).opacity(fill)
+                shape.fill(ControlColors.fill(button.colour, down: pressed || latched))
+                    .shadow(color: ControlColors.fill(button.colour, down: true).opacity(pressed ? 0.6 : 0),
+                            radius: pressed ? side * 0.12 : 0)
+                    .opacity(fill)
                 Text(button.title)
                     .font(ControlColors.font(min(17, side * 0.2)))
                     .foregroundStyle(ControlColors.text(button.colour))
@@ -112,9 +117,29 @@ struct ButtonFace: View {
                         .padding(side * 0.09)
                 }
             }
-            .scaleEffect(pressed ? 0.92 : 1)
+            // Dips and glows while pressed.
+            .scaleEffect(pressed ? 0.9 : 1)
+            .animation(.easeOut(duration: 0.08), value: pressed)
+            .animation(.easeOut(duration: 0.15), value: latched)
             .frame(width: geometry.size.width, height: geometry.size.height)
         }
+    }
+}
+
+/// A ring that grows and fades, again and again (a sticky button that is down).
+private struct PulseRing<S: Shape>: View {
+    let shape: S
+    @State private var out = false
+
+    var body: some View {
+        shape
+            .stroke(ControlColors.glow, lineWidth: 3)
+            .scaleEffect(out ? 1.4 : 1)
+            .opacity(out ? 0 : 0.85)
+            .onAppear {
+                withAnimation(.easeOut(duration: 1.6).repeatForever(autoreverses: false)) { out = true }
+            }
+            .allowsHitTesting(false)
     }
 }
 
@@ -141,6 +166,7 @@ struct KeyRowFace: View {
                             .opacity(label)
                     }
                     .scaleEffect(pressed ? 0.9 : 1)
+                    .animation(.easeOut(duration: 0.08), value: pressed)
                     .frame(width: frame.width, height: frame.height)
                     .position(x: frame.midX, y: frame.midY)
             }
@@ -180,15 +206,21 @@ struct StickFace: View {
         GeometryReader { geometry in
             let side = min(geometry.size.width, geometry.size.height)
             let knob = state?.knob ?? .zero
+            let held = state?.pressed == true
             let reach = side * ControlsRuntime.stickReach
             ZStack {
                 Circle()
-                    .fill(ControlColors.lilac.opacity(state?.pressed == true ? 0.3 : 0.15))
-                    .strokeBorder(Color.white.opacity(0.7), lineWidth: 3)
+                    .fill(ControlColors.lilac.opacity(held ? 0.22 : 0.12))
+                    .strokeBorder(held ? ControlColors.glow : Color.white.opacity(0.6), lineWidth: 3)
+                    .shadow(color: ControlColors.lilac.opacity(held ? 0.5 : 0), radius: held ? 8 : 0)
+                    .animation(.easeOut(duration: 0.15), value: held)
+                // The knob follows the thumb, and springs back when it lifts.
                 Circle()
-                    .fill(Color.white.opacity(0.85))
+                    .fill(Color.white.opacity(0.9))
                     .frame(width: side * 0.4, height: side * 0.4)
+                    .shadow(color: .black.opacity(0.35), radius: 5, y: 3)
                     .offset(x: knob.x * reach, y: knob.y * reach)
+                    .animation(held ? nil : .spring(response: 0.25, dampingFraction: 0.55), value: knob)
                 if stick.worksAs == .wasd {
                     letters(side, knob: knob)
                 }

@@ -133,7 +133,10 @@ Both can be installed side by side. See "Akvavit's own app" below.
   - `GameSettingsStore` (per game: x87 on by default, screen size, controls);
   - `SetupFlow` (first-start setup, its JIT chain);
   - `GameSurfaceView` (picture and touch as mouse);
-  - `GameOverlay` (interface above the picture).
+  - `GameOverlay` (interface above the picture);
+  - `ControlLayoutStore` (built-in and your control layouts, the global
+    haptics switch), `ControlsRuntime` (the layout in play, its touches,
+    what goes to the game), `TextBridge` (typing into the game).
 - **App icon** (the user's choice, option C on the icon canvas): `App/AppIcon.icon`
   (Icon Composer file: background fill with a dark override, the controller
   as a light and a dark layer, glass off), which iOS 26 and later uses, plus
@@ -195,6 +198,38 @@ Both can be installed side by side. See "Akvavit's own app" below.
 
   The user found it works better than in Madeira (where hold never worked
   for them).
+- **On-screen controls** (2026-11-01, our own from scratch, the user's
+  design on the canvas; nothing of Madeira's controls):
+  - Model and store in `Kit/ControlLayouts.swift`, `BuiltInLayouts.swift`,
+    `ControlLayoutStore.swift` (`akvavit-control-layouts.json` in
+    Application Support, lenient decoding). Places are points from the
+    nearest edge (or middle) of the **whole display**, not the safe area
+    (the user: a game fills the display).
+  - In play: `GameOverlay`'s window takes only touches that begin on a
+    control (`ControlsInputView.owns`); the rest go to `GameSurfaceView`,
+    so a control and the game can be touched at once. Buttons come before
+    trackpads where they overlap. A layout can turn touch on the game off
+    (shooters); four fingers still open the menu.
+  - Engine calls: keys `winios_post_key`; mouse buttons and the wheel
+    `winios_pointer` without MOVE (no position); mouse trackpad ABSOLUTE
+    moves; aim pad and aim stick relative moves (raw input sees them, so
+    mouse-look works); text `winios_try_post_text` (returns 0 when busy:
+    retry the same character); controller `winios_gamepad_set_state(0, …)`
+    (+y up). The input ring (256 events) drops the *newest* event when
+    full, so motion is sent once per display frame (a `CADisplayLink`);
+    a lost key-up would leave a key down.
+  - Press is held at least 50 ms; Hold toggles; Sticky lets go after the
+    next key or click is let go (a click on the game counts). The same key
+    from two controls is counted, so it goes up once. Everything held is let
+    go when the app resigns active, the menu opens or the session ends.
+  - The virtual controller connects when a layout with controller parts is
+    first used and stays for the app run (a game finds controllers at its
+    start). Portal never reads it (see Portal below; parked).
+  - Haptics: a light tap when a control is touched, only if its own switch,
+    its layout's and the Controls tab's are all on.
+  - The studio and the game screen are locked to landscape
+    (`App/OrientationLock.swift`). The studio is a layer in `RootView`, not
+    a `fullScreenCover` (that one didn't open until the tab had redrawn).
 - **Logs:** `Documents/madeira-log.txt` copies empty while a game runs, but
   the hard links in `Documents/logs/` copy fine. Our lines are tagged
   `[session]` (with `fps` every 10 s), `[touch]`, `[controls]` and
@@ -230,7 +265,8 @@ Both can be installed side by side. See "Akvavit's own app" below.
   - Launch options other than Steam's first.
   - Per-game settings files.
   - Background downloads.
-  - On-screen controls and keyboard: with the real interface.
+  - Choosing a game's control layout in its settings (not designed yet;
+    the four-finger test menu chooses one meanwhile).
 
 ## Updating Madeira
 
@@ -266,10 +302,12 @@ through Dock at 60 FPS, RT2, Portal).
   only what the user has settled (on the design canvas, since 2026-11-01:
   the tab column, Library, the game popup with its flip and settings side,
   Get games, setup; Settings as one big card, contents still open).
+  The Controls tab and studio are designed and built (2026-11-01).
   Everything in `App/Test/` is temporary test screens for checking AkvavitKit;
   the Settings tab holds them until Settings is designed. Not designed yet:
-  Controls, Settings' contents, the in-game menu (controls, Quit), dark-mode
-  colours (placeholders in `App/Theme.swift`).
+  Settings' contents, the in-game menu (controls, Quit), choosing a game's
+  layout in its settings, dark-mode colours (placeholders in
+  `App/Theme.swift`).
 - **FEX changes are the user's call** (an earlier note here called FEX
   untouchable; the user never set that rule). Upstream FEX-Emu doesn't accept
   AI-generated code (unverified), which only matters for sending changes

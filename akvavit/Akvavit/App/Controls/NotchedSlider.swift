@@ -3,6 +3,7 @@
 // A slider that stops only at its notches (the canvas's sliders for sizes,
 // speeds and the grid): a track filled up to the knob, a mark at each notch.
 
+import AkvavitKit
 import SwiftUI
 
 struct NotchedSlider: View {
@@ -34,7 +35,10 @@ struct NotchedSlider: View {
             .gesture(DragGesture(minimumDistance: 0).onChanged { drag in
                 let notch = Int((drag.location.x / span * CGFloat(values.count - 1)).rounded())
                 let chosen = values[min(max(notch, 0), values.count - 1)]
-                if chosen != value { value = chosen }
+                guard chosen != value else { return }
+                value = chosen
+                // A tick at each notch, unless haptics are off on the Controls tab.
+                if ControlLayoutStore.shared.haptics { UISelectionFeedbackGenerator().selectionChanged() }
             })
         }
         .frame(height: 30)

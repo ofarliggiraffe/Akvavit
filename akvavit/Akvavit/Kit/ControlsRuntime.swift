@@ -43,6 +43,7 @@ public final class ControlsRuntime {
     /// Advances when everything is let go, so touches from before change nothing.
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
+    @ObservationIgnored private lazy var haptics = UIImpactFeedbackGenerator(style: .light)
     /// Trackpads with fingers on them, and motion not sent yet
     /// (ControlsTrackpads.swift).
     @ObservationIgnored var trackpads: [UUID: TrackpadFingers] = [:]
@@ -155,6 +156,7 @@ public final class ControlsRuntime {
 
     /// A finger landed on `control` (`finger` names it until it lifts).
     func began(_ control: Control, key: Int?, finger: ObjectIdentifier, at point: CGPoint) -> Touch? {
+        tap(for: control)
         let state = state(of: control.id)
         let action: ControlAction, behaviour: PressBehaviour
         switch control.kind {
@@ -230,6 +232,13 @@ public final class ControlsRuntime {
         guard touch.generation == generation, case .press(let action, _) = touch.role else { return }
         release(action)
         releaseStickies()
+    }
+
+    /// A light tap under the finger: only when the control's own switch,
+    /// its layout's and the Controls tab's are all on.
+    private func tap(for control: Control) {
+        guard control.haptics, layout?.haptics == true, ControlLayoutStore.shared.haptics else { return }
+        haptics.impactOccurred()
     }
 
     // MARK: Sending

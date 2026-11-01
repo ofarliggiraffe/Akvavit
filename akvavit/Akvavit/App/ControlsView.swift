@@ -2,7 +2,8 @@
 //
 // The Controls tab (the canvas's "Controls" board): the built-in layouts and
 // your copies, each a card with a picture of its controls. A card opens the
-// layout in the studio. Haptics for every layout switch on and off here.
+// layout in the studio; a long press on one of yours asks to delete it. Haptics
+// for every layout switch on and off here.
 
 import AkvavitKit
 import SwiftUI
@@ -11,6 +12,8 @@ struct ControlsView: View {
     let compact: Bool
     /// Shows a layout in the studio (RootView shows it above everything).
     let openStudio: (String) -> Void
+    /// Asks whether to delete one of your layouts (RootView shows the card).
+    let askDelete: (ControlLayout) -> Void
     @Bindable private var store = ControlLayoutStore.shared
 
     var body: some View {
@@ -69,10 +72,21 @@ struct ControlsView: View {
     private func grid(_ layouts: [ControlLayout]) -> some View {
         LayoutGrid(compact: compact) {
             ForEach(layouts) { layout in
-                Button { openStudio(layout.id) } label: {
-                    LayoutCard(layout: layout)
-                }
-                .buttonStyle(.plain)
+                // A tap opens it; a long press on one of yours asks to delete it.
+                LayoutCard(layout: layout)
+                    .onTapGesture { openStudio(layout.id) }
+                    .onLongPressGesture {
+                        guard !layout.isBuiltIn else { return }
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        askDelete(layout)
+                    }
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction { openStudio(layout.id) }
+                    .accessibilityActions {
+                        if !layout.isBuiltIn {
+                            Button("Delete") { askDelete(layout) }
+                        }
+                    }
             }
         }
     }

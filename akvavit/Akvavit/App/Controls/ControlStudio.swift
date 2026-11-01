@@ -33,6 +33,12 @@ struct ControlStudio: View {
     @State private var showingMenu = false
     @State private var confirmingDelete = false
     @State private var model = StudioModel()
+    /// "Add a control" is open.
+    @State private var adding = false
+    /// The key picker is open: for a new button (nil) or for this control.
+    @State private var choosingKey: KeyFor?
+    /// The display, for placing new controls.
+    @State private var area = CGRect.zero
     /// A narrow display: the shorter tool bar.
     @State private var compact = false
     private let close: () -> Void
@@ -56,12 +62,16 @@ struct ControlStudio: View {
                         ControlsCanvas(layout: layout, area: area)
                     } else {
                         StudioEditor(layout: layout, area: area, model: model, save: store.update)
+                        panel(layout, area: area)
                     }
                 }
             }
         }
         .ignoresSafeArea()
-        .onGeometryChange(for: Bool.self) { $0.size.width < 900 } action: { compact = $0 }
+        .onGeometryChange(for: CGRect.self) { CGRect(origin: .zero, size: $0.size) } action: { area in
+            self.area = area
+            compact = area.width < 900
+        }
         .overlay(alignment: .top) {
             HStack(alignment: .top, spacing: 12) {
                 floating(topBar)
@@ -71,21 +81,27 @@ struct ControlStudio: View {
             .padding(.horizontal, compact ? 16 : 24)
             .padding(.top, compact ? 14 : 18)
         }
+        .overlay {
+            if confirmingDelete {
+                DeleteLayoutCard(name: layout?.name ?? "") {
+                    store.delete(layoutID)
+                    close()
+                } cancel: {
+                    withAnimation(.easeOut(duration: 0.2)) { confirmingDelete = false }
+                }
+            } else if adding {
+                AddControlCard(add: add) { adding = false }
+            } else if let target = choosingKey {
+                KeyPicker(subtitle: keySubtitle(target), allActions: target.control != nil,
+                          pick: { action in pickKey(action, for: target) }, close: { choosingKey = nil })
+            }
+        }
         .statusBarHidden()
         .persistentSystemOverlays(.hidden)
         // Landscape is locked by whoever shows the studio, before it shows.
         .onAppear { name = layout?.name ?? "" }
         .onChange(of: naming) { _, focused in
             if !focused { saveName() }
-        }
-        .alert("Delete \u{201C}\(layout?.name ?? "")\u{201D}?", isPresented: $confirmingDelete) {
-            Button("Delete", role: .destructive) {
-                store.delete(layoutID)
-                close()
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Games that use it go back to Touch as mouse.")
         }
     }
 
@@ -99,9 +115,36 @@ struct ControlStudio: View {
             .animation(.easeOut(duration: 0.15), value: model.isInteracting)
     }
 
+    /// The selected control's panel, on the side away from it, under the top bars.
+    @ViewBuilder
+    private func panel(_ layout: ControlLayout, area: CGRect) -> some View {
+        if let id = model.selected, let control = layout.controls.first(where: { $0.id == id }) {
+            let onRight = model.frame(of: control, in: area).midX < area.midX
+            floating(ControlPanel(control: control, compact: compact,
+                                  change: { edit in change(id, edit) },
+                                  chooseKey: { choosingKey = KeyFor(control: id) },
+                                  duplicate: { duplicate(control) },
+                                  delete: { delete(id) },
+                                  done: { model.selected = nil }))
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: onRight ? .topTrailing : .topLeading)
+                .padding(.top, compact ? 68 : 82)
+                .padding(.bottom, compact ? 14 : 18)
+                .padding(.horizontal, compact ? 16 : 24)
+        }
+    }
+
     private var toolBar: some View {
         @Bindable var model = model
         return HStack(spacing: compact ? 10 : 12) {
+            Button("+ Add") {
+                model.selected = nil
+                adding = true
+            }
+            .font(.quicksand(14, .bold, relativeTo: .subheadline))
+            .foregroundStyle(.white)
+            .padding(.horizontal, compact ? 12 : 14)
+            .frame(height: compact ? 36 : 38)
+            .background(Theme.controlsColors.tint, in: .capsule)
             Text(compact ? "Grid" : "Snap to grid")
                 .font(.quicksand(13, .bold, relativeTo: .footnote))
                 .foregroundStyle(Theme.outlineText)
@@ -165,7 +208,7 @@ struct ControlStudio: View {
                     if let layout {
                         LayoutMenu(layout: layout) {
                             showingMenu = false
-                            confirmingDelete = true
+                            withAnimation(.easeOut(duration: 0.2)) { confirmingDelete = true }
                         }
                         .presentationCompactAdaptation(.popover)
                     }
@@ -199,6 +242,72 @@ struct ControlStudio: View {
 
     // MARK: Actions
 
+    // Changing controls (your layouts only; each change is saved at once).
+
+    private func change(_ id: UUID, _ edit: (inout Control) -> Void) {
+        guard var layout, !layout.isBuiltIn, let index = layout.controls.firstIndex(where: { $0.id == id }) else { return }
+        edit(&layout.controls[index])
+        store.update(layout)
+    }
+
+    /// New controls in the middle of the display, the (last) one selected.
+    private func insert(_ controls: [Control]) {
+        guard var layout, !layout.isBuiltIn, !controls.isEmpty else { return }
+        layout.controls += controls
+        store.update(layout)
+        model.selected = controls.last?.id
+    }
+
+    private func add(_ choice: AddChoice) {
+        adding = false
+        if choice == .anyKey {
+            choosingKey = KeyFor(control: nil)
+        } else {
+            insert(choice.controls(at: CGPoint(x: area.midX, y: area.midY), in: area))
+        }
+    }
+
+    private func pickKey(_ action: ControlAction, for target: KeyFor) {
+        choosingKey = nil
+        if let id = target.control {
+            change(id) { control in
+                guard case .button(var button) = control.kind else { return }
+                button.action = action
+                // The wheel and the keyboard button can't stay down.
+                switch action {
+                case .keyboard, .wheel: button.whenTapped = .press
+                default: break
+                }
+                control.kind = .button(button)
+            }
+        } else if case .key(let vk) = action {
+            insert([AddChoice.keyButton(vk, at: CGPoint(x: area.midX, y: area.midY), in: area)])
+        }
+    }
+
+    private func keySubtitle(_ target: KeyFor) -> String {
+        guard let id = target.control, let control = layout?.controls.first(where: { $0.id == id }),
+              case .button(let button) = control.kind else { return "For the new button" }
+        return "For the \(button.title) button"
+    }
+
+    /// A copy a grid step down and to the right, selected.
+    private func duplicate(_ control: Control) {
+        var copy = control
+        copy.id = UUID()
+        let step = CGFloat(model.snaps ? model.spacing : 24)
+        let frame = control.placement.frame(in: area).offsetBy(dx: step, dy: step)
+        copy.placement = Placement.anchored(frame, in: area)
+        insert([copy])
+    }
+
+    private func delete(_ id: UUID) {
+        guard var layout, !layout.isBuiltIn else { return }
+        layout.controls.removeAll { $0.id == id }
+        store.update(layout)
+        model.selected = nil
+    }
+
     private func mirror() {
         guard let layout, !layout.isBuiltIn else { return }
         store.update(StudioModel.mirrored(layout))
@@ -221,6 +330,11 @@ struct ControlStudio: View {
         store.rename(layoutID, to: name)
         name = store.layout(id: layoutID)?.name ?? name
     }
+}
+
+/// What the key picker chooses for: a control, or a new button (nil).
+private struct KeyFor {
+    let control: UUID?
 }
 
 /// The name, in the white pill of the studio boards.
