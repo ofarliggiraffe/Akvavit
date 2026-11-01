@@ -20,6 +20,11 @@ options:
   developmentLanguage: en
   deploymentTarget:
     iOS: "17.0"
+  # Icon Composer files (App/AppIcon.icon) are folders that Xcode treats as one file.
+  fileTypes:
+    icon:
+      file: true
+      buildPhase: resources
 
 configFiles:
   Debug: ../../app/Signing.xcconfig
@@ -148,6 +153,9 @@ targets:
       base:
         PRODUCT_NAME: Akvavit
         PRODUCT_BUNDLE_IDENTIFIER: $(AKVAVIT_APP_BUNDLE_IDENTIFIER)
+        # App/AppIcon.icon (iOS 26 and later) and App/Assets.xcassets (the
+        # fallback), drawn by scripts/make-app-icon.swift.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_FILE: App/Info.plist
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_ENTITLEMENTS: App/Akvavit.entitlements

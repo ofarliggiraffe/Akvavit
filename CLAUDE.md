@@ -134,6 +134,17 @@ Both can be installed side by side. See "Akvavit's own app" below.
   - `SetupFlow` (first-start setup, its JIT chain);
   - `GameSurfaceView` (picture and touch as mouse);
   - `GameOverlay` (interface above the picture).
+- **App icon** (the user's choice, option C on the icon canvas): `App/AppIcon.icon`
+  (Icon Composer file: background fill with a dark override, the controller
+  as a light and a dark layer, glass off), which iOS 26 and later uses, plus
+  `App/Assets.xcassets` as the fallback. `scripts/make-app-icon.swift` draws
+  all images (Core Graphics, the canvas's coordinates); `icon.json` is hand
+  written in Icon Composer's format. XcodeGen needs `fileTypes: icon` to keep
+  the `.icon` folder one file. Check a `.icon` with Icon Composer's `ictool`
+  (`…/Icon Composer.app/Contents/Executables/ictool <file> --export-image
+  --platform iOS --rendition Dark …`). On the phone, dark icons also need the
+  home screen's own setting (Edit › Customize: Dark or Automatic), and iOS
+  caches icons until a restart.
 - **Background downloads** (`Kit/DownloadActivity.swift`): one
   `BGContinuedProcessingTask` (iOS 26, so AkvavitKit targets 26) for the
   download queue, requested at the Install tap, identifier

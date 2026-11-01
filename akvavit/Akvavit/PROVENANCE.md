@@ -29,6 +29,7 @@ Written for Akvavit. Where a file stands in for something of Madeira's, it says 
 | `Kit/DockStart.swift` | Starting a Steam game through Madeira Dock: the sign-in transfer, the game, the one-time installs, Dock's variables. Calls Dock's interface in `MadeiraDock.swift` and `DockInstallers.swift` (Madeira's, to replace); the steps follow what Dock expects. |
 | `Kit/GameOverlay.swift` | A window above the game's picture for in-game interface: it takes every touch (a menu), or only those the interface claims (controls). |
 | `Kit/GameSurface.swift` | The picture's place (the window-level Metal layer, layout) and touch as mouse. Follows two findings of Madeira's: the layer must not be in a SwiftUI-hosted view, and presents need the layer's display sync off. |
+| `App/AppIcon.icon` (the app icon as an Icon Composer file, which iOS 26 and later uses: background, light and dark layers), `App/Assets.xcassets` (the same icon whole, as the fallback), `scripts/make-app-icon.swift` (draws the images) | The icon the user chose on the design canvas (option C, a controller filled with a wireframe grid). |
 | `App/Info.plist`, `App/Akvavit.entitlements` | The app's keys and capabilities. |
 | `Kit/AkvavitKit.swift` | `AkvavitEngine.start()`. |
 | `Kit/JIT.swift` | AkvavitKit's JIT model. **For now it drives Madeira's JIT code** (`JITCoordinator`, `OnDevicePairing`, `StikJITHelper`); its public API is ours and stays when that code is replaced. |
