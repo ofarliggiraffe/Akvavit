@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // The screen a session runs on: the picture over the whole display, touches as
-// the mouse, the chosen controls over it. While it starts, and after it ends,
-// a status shows instead.
+// the mouse, the chosen controls over it. While it starts the loading screen
+// covers it (until the game is up); after it ends, a status shows instead.
 
 import AkvavitKit
 import SwiftUI
@@ -48,6 +48,13 @@ struct TestGameMenu: View {
                         runtime.use(layout)
                     }))
                 .frame(width: 252)
+                if !StartProgress.shared.gameIsUp {
+                    // A way out if the loading screen misses a game's window.
+                    Toggle("Show Windows' screen", isOn: Binding(
+                        get: { StartProgress.shared.showingWindows },
+                        set: { StartProgress.shared.setShowingWindows($0) }))
+                    .frame(width: 252)
+                }
             }
             VStack(spacing: 12) {
                 Text("Test menu").font(.headline)
@@ -70,24 +77,28 @@ struct TestGameMenu: View {
 
 struct GameScreen: View {
     private let session = Session.shared
+    private let progress = StartProgress.shared
 
     var body: some View {
         ZStack {
             GameSurface().ignoresSafeArea()
             switch session.state {
-            case .idle, .running:
-                if let problem = session.dockProblem {
+            case .idle, .starting, .running:
+                // The loading screen itself is in the overlay window, above
+                // Windows' screen (ControlsOverlay); its background here too,
+                // for the moment before that window shows.
+                if progress.covers {
+                    ThemeBackground().ignoresSafeArea().allowsHitTesting(false)
+                } else if let problem = session.dockProblem {
                     Text(problem)
                         .padding(12)
                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
                         .padding()
                         .frame(maxHeight: .infinity, alignment: .top)
                 }
-            case .starting(let step):
-                VStack(spacing: 12) {
-                    ProgressView().tint(.white)
-                    Text(step).foregroundStyle(.white)
-                }
+            case .ended where progress.covers:
+                // A problem before the game was up: the loading screen says it.
+                ThemeBackground().ignoresSafeArea().allowsHitTesting(false)
             case .ended(let reason):
                 VStack(spacing: 16) {
                     Text(reason == nil ? "The program has ended." : "The program stopped.")
@@ -106,13 +117,20 @@ struct GameScreen: View {
         .statusBarHidden()
         .persistentSystemOverlays(.hidden)
         // Windows' screen is landscape, and so are the controls (as in the studio).
-        .onAppear { OrientationLock.lock() }
+        .onAppear {
+            OrientationLock.lock()
+            // The overlay window at once: the loading screen is in it, and the
+            // controls show there once the game is up.
+            ControlsOverlay.shared.show()
+        }
         .onDisappear { OrientationLock.unlock() }
+        .animation(.easeOut(duration: 0.5), value: progress.covers)
         .onChange(of: session.state, initial: true) { _, state in
             switch state {
             case .running: ControlsOverlay.shared.show()
-            case .ended: ControlsOverlay.shared.hide()
-            case .idle, .starting: break
+            // The overlay stays while the loading screen shows a problem.
+            case .ended where !progress.covers: ControlsOverlay.shared.hide()
+            case .ended, .idle, .starting: break
             }
         }
     }

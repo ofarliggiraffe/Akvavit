@@ -3,7 +3,10 @@
 // The on-screen controls over a running game, in GameOverlay's window. Touches
 // that begin on a control are the controls'; every other touch goes to the
 // game. The (temporary) test menu opens in the same window, over the
-// controls, and takes every touch while it shows.
+// controls, and takes every touch while it shows. The loading screen is in
+// this window too, under the controls: above everything of Windows' screen,
+// so nothing of it shows through however early it appears. While it covers
+// the game it takes only touches on its button.
 
 import AkvavitKit
 import SwiftUI
@@ -39,19 +42,24 @@ final class ControlsOverlay {
 
 final class ControlsOverlayController: UIViewController {
     private let input = ControlsInputView()
+    private let loading = UIHostingController(rootView: OverlayLoading())
     private let canvas = UIHostingController(rootView: OverlayControls())
     private var menu: UIHostingController<TestGameMenu>?
 
-    /// Only touches that begin on a control.
+    /// Only touches that begin on a control (on the loading screen's button
+    /// while it covers the game).
     var controlTouches: GameOverlay.Touches {
         .only { [weak self] point in
             guard let self else { return false }
+            if StartProgress.shared.covers { return LoadingTouches.button?.contains(point) ?? false }
             return self.input.owns(self.input.convert(point, from: nil))
         }
     }
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        loading.view.backgroundColor = .clear
+        embed(loading)
         // The canvas draws; the input view above it takes the touches.
         canvas.safeAreaRegions = []
         canvas.view.backgroundColor = .clear
@@ -95,12 +103,36 @@ final class ControlsOverlayController: UIViewController {
     override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge { .all }
 }
 
+/// The loading screen while it covers the game; it fades out as the game shows.
+private struct OverlayLoading: View {
+    private let progress = StartProgress.shared
+    private let session = Session.shared
+
+    var body: some View {
+        ZStack {
+            if progress.covers {
+                LoadingScreen(game: game, title: game?.name ?? session.config?.displayName ?? "")
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: 0.5), value: progress.covers)
+    }
+
+    /// From the Play tap; for a start from the test screens, from the session.
+    private var game: Game? {
+        if let game = progress.game { return game }
+        guard case .steam(let appID, _) = session.config?.program else { return nil }
+        return Games.shared.game("steam:\(appID)")
+    }
+}
+
 /// The chosen layout's controls, live.
 private struct OverlayControls: View {
     private let runtime = ControlsRuntime.shared
 
     var body: some View {
-        if let layout = runtime.layout {
+        // Not over the loading screen: the controls come with the game.
+        if let layout = runtime.layout, !StartProgress.shared.covers {
             ControlsCanvas(layout: layout, area: runtime.area, inPlay: true) { runtime.state(of: $0) }
         }
     }

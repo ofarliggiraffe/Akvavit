@@ -17,6 +17,10 @@ enum DockStart {
         /// This session runs only the one-time installs; the game starts in
         /// the next app run (they and the game do not fit in one session).
         var installsOnly: Bool
+        /// One-time installs run first.
+        var installs: Bool
+        /// The game's folder, as a Windows path (the loading screen's "game is up").
+        var gameFolder: String
     }
 
     /// Every variable a Dock start sets: cleared for other sessions.
@@ -66,7 +70,7 @@ enum DockStart {
             "MADEIRA_DOCK_INSTALLS_SESSION": installsOnly ? "1" : nil,
             // A session that runs installers turns the server's madsync off.
             "MADEIRA_MADSYNC_SESSION": DockInstallers.serverSync ? "0" : nil,
-        ], installsOnly: installsOnly)
+        ], installsOnly: installsOnly, installs: DockInstallers.script != nil, gameFolder: game.windowsInstallPath)
     }
 
     /// After a Dock session (or a start that failed): an unused sign-in transfer goes.

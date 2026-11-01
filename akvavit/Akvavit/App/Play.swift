@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // What Play does before the game starts: JIT on, Valve's client files in
-// place, then the session with the game's settings. Once the session starts,
-// the game screen comes up (RootView). What stops Play before that shows on
-// the popup.
+// place, then the session with the game's settings. The loading screen shows
+// from the start and lists these steps first (StartProgress); what stops Play
+// shows there, and on the popup.
 
 import AkvavitKit
 import SwiftUI
@@ -30,23 +30,33 @@ final class PlayStart {
         guard !busy, blocked == nil else { return }
         problem = nil
         defer { step = nil }
+        let progress = StartProgress.shared
+        progress.prepare(game, clientFiles: !Steam.shared.clientReady)
+        // The loading screen is drawn first (cover, name, steps); then the
+        // work starts, some of which keeps the app busy for a moment.
+        try? await Task.sleep(for: .milliseconds(350))
         if !JIT.shared.isOn {
             step = "Turning on JIT…"
             do {
                 try await JIT.shared.enable()
             } catch {
                 problem = "JIT didn't turn on. " + (JIT.shared.error ?? error.localizedDescription)
+                progress.report(.jit, .failed, problem ?? "")
                 return
             }
         }
+        progress.report(.jit, .done, "On")
         if !Steam.shared.clientReady {
             step = "Getting Steam's client files (once)…"
+            progress.report(.clientFiles, .now, "Downloading, once")
             do {
                 try await Steam.shared.prepareClient()
             } catch {
                 problem = "Steam's client files didn't download. " + error.localizedDescription
+                progress.report(.clientFiles, .failed, problem ?? "")
                 return
             }
+            progress.report(.clientFiles, .done, "Ready")
         }
         let settings = GameSettingsStore.shared[game.id]
         Session.shared.start(LaunchConfig(game: game, settings: settings, fitting: Self.fittingSize()))

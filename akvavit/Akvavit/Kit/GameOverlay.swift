@@ -28,7 +28,11 @@ public enum GameOverlay {
     /// Shows `controller`'s view over the game, filling the display. Replaces
     /// what was shown before. Give the view a clear background.
     public static func show(_ controller: UIViewController, touches: Touches = .all) {
-        guard let scene = GameLayerHost.shared.window?.windowScene else { return }
+        // The picture's scene, or before the picture is on a window (a start's
+        // first moment), the app's active one.
+        let active = UIApplication.shared.connectedScenes
+            .first { $0.activationState == .foregroundActive } as? UIWindowScene
+        guard let scene = GameLayerHost.shared.window?.windowScene ?? active else { return }
         let overlay = window ?? OverlayWindow(windowScene: scene)
         overlay.windowLevel = .normal + 1
         overlay.backgroundColor = .clear

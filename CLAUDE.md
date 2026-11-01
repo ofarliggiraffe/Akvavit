@@ -230,6 +230,37 @@ Both can be installed side by side. See "Akvavit's own app" below.
   - The studio and the game screen are locked to landscape
     (`App/OrientationLock.swift`). The studio is a layer in `RootView`, not
     a `fullScreenCover` (that one didn't open until the tab had redrawn).
+- **Loading screen** (2026-11-01, the user's option A on the canvas):
+  `Kit/StartProgress.swift` decides, `App/LoadingScreen.swift` draws (so the
+  look can change alone). It shows from the Play tap. Steps in real order:
+  JIT and Steam's client files (Play's own, `App/Play.swift` reports them;
+  a failure there offers Back), Windows, one-time installs
+  (they run before Dock signs in), Steam (Dock's report), the game. The game
+  is up when a visible window that has drawn belongs to a program inside the
+  game's own folder, once installs are done; a start without Steam at its
+  first frame; the finished list then shows 0.9 s and fades out over the
+  game. The loading screen is drawn in `GameOverlay`'s window (under the
+  controls), above Windows' screen: hiding Wine's desktop from the app's
+  window (every 0.2 s) still let it flash once, as its view is made after
+  the start. The picture (`GameLayerHost`) and, on a desktop session, the
+  compositor are hidden as well until then. Careful: `winios_compositor_set_hidden(1)` *drops* a
+  game-mode session's view, so only desktop sessions call it. A window with a
+  title bar from a program outside `C:\windows\` and the game's folder may
+  need an answer: "Show it" reveals Windows' screen until it closes. The
+  census (`winios_window_census_enable(1)`) runs during a Dock start; at "up"
+  it goes to mode 2, which keeps restoring windows first shown minimized.
+  Lines tagged `[start]`. The test menu's "Show Windows' screen" is the way
+  out if a game's window is missed.
+  A problem before the game is up fails its step in the loading screen:
+  Back before Windows started (JIT, client files), Close Akvavit after
+  (one session per app run). The game screen is a layer in `RootView` from
+  the Play tap, not a `fullScreenCover` (that came up only once the session
+  had started), and `GameLayerHost` starts hidden (its black covered the
+  loading screen).
+  The app's drawing stalls while JIT turns on and while Windows prepares
+  its JIT memory (likely the debugger pausing the process; not measured):
+  the spinner is a Core Animation layer (the render server turns it), and
+  the shown lines are paced 0.3 s apart so ticks arrive one by one.
 - **Logs:** `Documents/madeira-log.txt` copies empty while a game runs, but
   the hard links in `Documents/logs/` copy fine. Our lines are tagged
   `[session]` (with `fps` every 10 s), `[touch]`, `[controls]` and

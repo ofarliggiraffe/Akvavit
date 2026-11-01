@@ -2,8 +2,8 @@
 //
 // The app's one screen: the tab column on the left, the selected tab's content
 // beside it, the game popup above them, the controls studio over all of that
-// while it is open, and setup above everything on first start (or when run
-// again from Settings).
+// while it is open, a session's screen over everything while a game starts
+// and runs, and setup on first start (or when run again from Settings).
 
 import AkvavitKit
 import SwiftUI
@@ -42,6 +42,15 @@ struct RootView: View {
                 }
                 .zIndex(2)
             }
+            // A session's screen, from Play (the loading screen shows from the
+            // tap) or the test screens; one session per app run. A layer, not a
+            // presentation: a full-screen cover came up only once the session
+            // had started.
+            if Session.shared.state != .idle || StartProgress.shared.beforeSession {
+                GameScreen()
+                    .transition(.opacity)
+                    .zIndex(3)
+            }
             // Outside `main`, which ignores the keyboard: setup's card makes room for it.
             if !SetupFlow.shared.isDone {
                 SetupView()
@@ -79,7 +88,6 @@ struct RootView: View {
         // Steam's view of the games: at start, and after signing in.
         .task(id: signedIn) { await Games.shared.refresh() }
         // A session's screen, from Play or the test screens; one session per app run.
-        .fullScreenCover(isPresented: .constant(Session.shared.state != .idle)) { GameScreen() }
     }
 
     /// Landscape first, then the studio.

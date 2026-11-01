@@ -29,6 +29,9 @@ final class GameLayerHost: UIView {
         super.init(frame: frame)
         isUserInteractionEnabled = false
         backgroundColor = .black
+        // Hidden until a game is up (StartProgress shows it): it sits above
+        // the interface, and its black would cover the loading screen.
+        isHidden = true
         metalLayer.device = MTLCreateSystemDefaultDevice()
         metalLayer.pixelFormat = .bgra8Unorm
         metalLayer.framebufferOnly = true
@@ -190,8 +193,9 @@ public final class GameSurfaceView: UIView {
     private func send(_ point: CGPoint, _ flags: UInt32, data: UInt32 = 0) {
         // A control layout can leave the game without touch (shooters); four
         // fingers still open the menu.
+        // Nothing reaches the game while the loading screen covers it.
         let controls = ControlsRuntime.shared
-        guard controls.touchAsMouse else { return }
+        guard controls.touchAsMouse, !StartProgress.shared.covers else { return }
         let (x, y) = windowsPoint(point)
         winios_pointer(x, y, flags | MouseFlags.absolute | MouseFlags.move, data)
         controls.pointerMoved(toX: x, y: y)

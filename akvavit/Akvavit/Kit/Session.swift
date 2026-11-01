@@ -48,7 +48,7 @@ public struct LaunchConfig: Sendable {
         return true
     }
 
-    var displayName: String {
+    public var displayName: String {
         switch program {
         case .direct(let executable, _, _):
             return executable.split(whereSeparator: { $0 == "\\" || $0 == "/" }).last.map(String.init) ?? executable
@@ -101,15 +101,19 @@ public final class Session {
     public func start(_ config: LaunchConfig) {
         guard state == .idle else { return }
         guard JIT.shared.isOn else {
+            StartProgress.shared.ended(failure: "JIT is off. Enable JIT first.")
             state = .ended("JIT is off. Enable JIT first.")
             return
         }
         guard wineserver_is_running() == 0, wine_process_is_running() == 0 else {
+            StartProgress.shared.ended(failure: "A session already ran in this app run. Close Akvavit and open it again.")
             state = .ended("A session already ran in this app run. Close Akvavit and open it again.")
             return
         }
         self.config = config
         state = .starting("Preparing")
+        let steam: Bool = if case .steam = config.program { true } else { false }
+        StartProgress.shared.begin(steam: steam, desktop: config.isDesktop)
         AkvavitSessionLogs.prune()
         LogStore.shared.startSessionLog(program: config.displayName)
         LogStore.shared.log("[session] start \(config.displayName) screen=\(config.screenWidth)x\(config.screenHeight) "
@@ -125,6 +129,8 @@ public final class Session {
                 let dock = try await DockStart.prepare(appID: appID, arguments: arguments,
                                                        width: config.screenWidth, height: config.screenHeight)
                 installsOnly = dock.installsOnly
+                StartProgress.shared.dockPrepared(gameFolder: dock.gameFolder, installs: dock.installs,
+                                                  installsOnly: dock.installsOnly)
                 var environment = Self.environment(for: config)
                 environment.merge(dock.environment) { _, dock in dock }
                 for (name, value) in config.extraEnvironment { environment[name] = .some(value) }
@@ -133,6 +139,7 @@ public final class Session {
             } catch {
                 LogStore.shared.log("[session] Dock not started: \(error.localizedDescription)", level: .error)
                 DockStart.finish()
+                StartProgress.shared.ended(failure: error.localizedDescription)
                 state = .ended(error.localizedDescription)
             }
         }
@@ -215,7 +222,9 @@ public final class Session {
         //    and FEX put all translated code in. The debugger has to be attached.
         report(.step("Preparing JIT memory"))
         guard let pool = StikJITHelper.allocatePool(poolSize: poolMegabytes << 20) else {
-            report(.ended(StikJITHelper.poolFailure ?? "The JIT memory could not be prepared."))
+            // Madeira's helper words it for Madeira's app; its text goes to the log.
+            LogStore.shared.log("[session] JIT pool failed: \(StikJITHelper.poolFailure ?? "no reason given")", level: .error)
+            report(.ended("The JIT memory could not be prepared. Close Akvavit, open it again and press Play."))
             return
         }
         setenv("WINE_IOS_JIT_RX", String(format: "%lx", Int(bitPattern: pool.rx)), 1)
@@ -319,10 +328,13 @@ public final class Session {
 
     private func apply(_ update: Update) {
         switch update {
-        case .step(let what): state = .starting(what)
+        case .step(let what):
+            state = .starting(what)
+            StartProgress.shared.windowsStep(what)
         case .running:
             state = .running
-            GameLayerHost.shared.isHidden = false
+            // The picture shows once the game is up (StartProgress).
+            StartProgress.shared.running()
         case .frames(let count): framesPresented = count
         case .ended(var reason):
             dockWatch?.invalidate()
@@ -334,6 +346,9 @@ public final class Session {
                 DockStart.finish()
             }
             state = .ended(reason)
+            // A problem before the game was up shows in the loading screen (not
+            // the end of a session of one-time installs: that is no problem).
+            StartProgress.shared.ended(failure: installsOnly ? nil : reason)
             // The picture sits above the interface: it goes with the session.
             GameLayerHost.shared.isHidden = true
             _ = winios_compositor_set_hidden(1)

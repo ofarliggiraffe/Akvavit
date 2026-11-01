@@ -309,9 +309,14 @@ public final class ControlsInputView: UIView {
 
     required init?(coder: NSCoder) { fatalError("not used") }
 
+    /// While the loading screen covers the game, touches go past to it.
+    public override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        StartProgress.shared.covers ? nil : super.hitTest(point, with: event)
+    }
+
     /// Whether a touch at `point` (in this view) is on a control.
     public func owns(_ point: CGPoint) -> Bool {
-        runtime.control(at: point) != nil
+        !StartProgress.shared.covers && runtime.control(at: point) != nil
     }
 
     public override func layoutSubviews() {
