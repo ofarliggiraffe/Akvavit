@@ -64,7 +64,11 @@ public struct Control: Identifiable, Equatable, Sendable {
     public var id = UUID()
     public var placement: Placement
     public var haptics = true
+    /// How solid it looks over the game, 0 to 1.
+    public var opacity = Control.defaultOpacity
     public var kind: Kind
+
+    public static let defaultOpacity = 0.35
 
     public init(_ kind: Kind, _ placement: Placement) {
         self.kind = kind
@@ -312,6 +316,7 @@ public struct ControlKeyRow: Codable, Equatable, Sendable {
 }
 
 public struct ControlTrackpad: Codable, Equatable, Sendable {
+    /// A trackpad only moves; clicks are buttons.
     public enum Mode: String, Codable, Sendable {
         /// Moves the Windows cursor.
         case mouse
@@ -323,8 +328,6 @@ public struct ControlTrackpad: Codable, Equatable, Sendable {
 
     public var mode: Mode
     public var speed = 1.0
-    public var tapToClick = true
-    public var twoFingerRightClick = true
 
     public init(_ mode: Mode) { self.mode = mode }
 
@@ -332,8 +335,6 @@ public struct ControlTrackpad: Codable, Equatable, Sendable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         mode = try c.decode(Mode.self, forKey: .mode)
         speed = c.value(.speed, or: 1.0)
-        tapToClick = c.value(.tapToClick, or: true)
-        twoFingerRightClick = c.value(.twoFingerRightClick, or: true)
     }
 }
 
@@ -361,7 +362,7 @@ public struct ControlStick: Codable, Equatable, Sendable {
 
 extension Control: Codable {
     private enum CodingKeys: String, CodingKey {
-        case id, placement, haptics, type, button, keyRow, trackpad, stick
+        case id, placement, haptics, opacity, type, button, keyRow, trackpad, stick
     }
 
     public init(from decoder: Decoder) throws {
@@ -369,6 +370,7 @@ extension Control: Codable {
         id = c.value(.id, or: UUID())
         placement = try c.decode(Placement.self, forKey: .placement)
         haptics = c.value(.haptics, or: true)
+        opacity = c.value(.opacity, or: Control.defaultOpacity)
         switch try c.decode(String.self, forKey: .type) {
         case "button": kind = .button(try c.decode(ControlButton.self, forKey: .button))
         case "keyRow": kind = .keyRow(try c.decode(ControlKeyRow.self, forKey: .keyRow))
@@ -384,6 +386,7 @@ extension Control: Codable {
         try c.encode(id, forKey: .id)
         try c.encode(placement, forKey: .placement)
         try c.encode(haptics, forKey: .haptics)
+        try c.encode(opacity, forKey: .opacity)
         switch kind {
         case .button(let button): try c.encode("button", forKey: .type); try c.encode(button, forKey: .button)
         case .keyRow(let row): try c.encode("keyRow", forKey: .type); try c.encode(row, forKey: .keyRow)

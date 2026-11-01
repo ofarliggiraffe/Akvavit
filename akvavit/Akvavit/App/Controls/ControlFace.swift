@@ -12,19 +12,31 @@ import SwiftUI
 struct ControlsCanvas: View {
     let layout: ControlLayout
     let safeArea: CGRect
+    /// Over a game: trackpads are invisible there (only the studio shows them).
+    var inPlay = false
     /// The live state of each control (in play); nil draws it at rest.
     var state: (UUID) -> ControlState? = { _ in nil }
 
     var body: some View {
         ZStack(alignment: .topLeading) {
-            ForEach(layout.controls) { control in
-                let frame = control.placement.frame(in: safeArea)
-                ControlFace(control: control, state: state(control.id))
-                    .frame(width: frame.width, height: frame.height)
-                    .position(x: frame.midX, y: frame.midY)
+            // Trackpads under everything else: buttons over them take the touch.
+            ForEach(layout.controls.filter(\.isTrackpad) + layout.controls.filter { !$0.isTrackpad }) { control in
+                if !(inPlay && control.isTrackpad) {
+                    let frame = control.placement.frame(in: safeArea)
+                    ControlFace(control: control, state: state(control.id))
+                        .opacity(control.opacity)
+                        .frame(width: frame.width, height: frame.height)
+                        .position(x: frame.midX, y: frame.midY)
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+private extension Control {
+    var isTrackpad: Bool {
+        if case .trackpad = kind { true } else { false }
     }
 }
 
@@ -36,7 +48,7 @@ struct ControlFace: View {
         switch control.kind {
         case .button(let button): ButtonFace(button: button, state: state)
         case .keyRow(let row): KeyRowFace(row: row, state: state)
-        case .trackpad(let pad): TrackpadFace(pad: pad)
+        case .trackpad(let pad): TrackpadFace(pad: pad, state: state)
         case .stick(let stick): StickFace(stick: stick)
         }
     }
@@ -134,10 +146,11 @@ struct KeyRowFace: View {
 
 struct TrackpadFace: View {
     let pad: ControlTrackpad
+    let state: ControlState?
 
     var body: some View {
         RoundedRectangle(cornerRadius: 22, style: .continuous)
-            .fill(Color.white.opacity(0.06))
+            .fill(Color.white.opacity(state?.pressed == true ? 0.14 : 0.06))
             .strokeBorder(Color.white.opacity(0.6), style: StrokeStyle(lineWidth: 2, dash: [8, 6]))
             .overlay {
                 Text(title)

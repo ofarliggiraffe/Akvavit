@@ -41,6 +41,13 @@ public final class ControlsRuntime {
     /// Advances when everything is let go, so touches from before change nothing.
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
+    /// Trackpads with fingers on them, and motion not sent yet
+    /// (ControlsTrackpads.swift).
+    @ObservationIgnored var trackpads: [UUID: TrackpadFingers] = [:]
+    @ObservationIgnored var cursor: CGPoint?
+    @ObservationIgnored var cursorMoved = false
+    @ObservationIgnored var aim = CGVector.zero
+    @ObservationIgnored var motionLink: CADisplayLink?
 
     /// Games see a press at least this long, however quick the tap.
     private static let shortestPress: CFTimeInterval = 0.05
@@ -73,6 +80,7 @@ public final class ControlsRuntime {
 
     /// Lets go of everything the controls hold down.
     public func releaseAll() {
+        stopTrackpads()
         for action in downCounts.keys { send(action, down: false) }
         downCounts = [:]
         stickies = [:]
@@ -94,32 +102,38 @@ public final class ControlsRuntime {
         releaseStickies()
     }
 
+    /// Touch on the game moved the cursor to (x, y) Windows pixels: the
+    /// mouse trackpad goes on from there.
+    func pointerMoved(toX x: Int32, y: Int32) {
+        cursor = CGPoint(x: Int(x), y: Int(y))
+    }
+
     // MARK: Touches
 
     struct Touch {
         let control: UUID
-        let action: ControlAction
-        let behaviour: PressBehaviour
+        /// For buttons and keys: what the touch holds, and how. Nil on a trackpad.
+        let press: (action: ControlAction, behaviour: PressBehaviour)?
         let generation: Int
         let began: CFTimeInterval
     }
 
     /// The control at `point` that takes touches, with the key for a key row.
+    /// Buttons and keys over a trackpad come first.
     func control(at point: CGPoint) -> (control: Control, key: Int?)? {
         guard let layout else { return nil }
-        for control in layout.controls.reversed() {
-            let frame = control.placement.frame(in: safeArea)
-            guard frame.contains(point) else { continue }
+        let hits = layout.controls.reversed().filter { $0.placement.frame(in: safeArea).contains(point) }
+        for control in hits {
             switch control.kind {
             case .button(let button) where Self.works(button.action):
                 return (control, nil)
             case .keyRow(let row):
-                if let key = row.keyIndex(at: point.x, in: frame) { return (control, key) }
+                if let key = row.keyIndex(at: point.x, in: control.placement.frame(in: safeArea)) { return (control, key) }
             default:
                 continue
             }
         }
-        return nil
+        return hits.first { if case .trackpad = $0.kind { true } else { false } }.map { ($0, nil) }
     }
 
     /// What this version sends to the game.
@@ -130,10 +144,14 @@ public final class ControlsRuntime {
         }
     }
 
-    func began(_ control: Control, key: Int?) -> Touch? {
+    /// A finger landed on `control` (`finger` names it until it lifts).
+    func began(_ control: Control, key: Int?, finger: ObjectIdentifier, at point: CGPoint) -> Touch? {
         let state = state(of: control.id)
         let action: ControlAction, behaviour: PressBehaviour
         switch control.kind {
+        case .trackpad(let pad):
+            trackpadBegan(control.id, pad, finger: finger, at: point)
+            return Touch(control: control.id, press: nil, generation: generation, began: CACurrentMediaTime())
         case .button(let button):
             (action, behaviour) = (button.action, button.whenTapped)
         case .keyRow(let row):
@@ -166,15 +184,20 @@ public final class ControlsRuntime {
                 press(action)
             }
         }
-        return Touch(control: control.id, action: action, behaviour: behaviour,
+        return Touch(control: control.id, press: (action, behaviour),
                      generation: generation, began: CACurrentMediaTime())
     }
 
-    func ended(_ touch: Touch) {
+    func moved(_ touch: Touch, finger: ObjectIdentifier, to point: CGPoint) {
+        if touch.press == nil { trackpadMoved(touch.control, finger: finger, to: point) }
+    }
+
+    func ended(_ touch: Touch, finger: ObjectIdentifier) {
+        guard let press = touch.press else { return trackpadEnded(touch.control, finger: finger) }
         let state = state(of: touch.control)
         state.pressed = false
         state.pressedKey = nil
-        guard touch.behaviour == .press, touch.generation == generation else { return }
+        guard press.behaviour == .press, touch.generation == generation else { return }
         let wait = Self.shortestPress - (CACurrentMediaTime() - touch.began)
         guard wait > 0 else { return finishPress(touch) }
         DispatchQueue.main.asyncAfter(deadline: .now() + wait) { [weak self] in
@@ -183,14 +206,14 @@ public final class ControlsRuntime {
     }
 
     private func finishPress(_ touch: Touch) {
-        guard touch.generation == generation else { return }
-        release(touch.action)
+        guard touch.generation == generation, let press = touch.press else { return }
+        release(press.action)
         releaseStickies()
     }
 
     // MARK: Sending
 
-    private func releaseStickies() {
+    func releaseStickies() {
         guard !stickies.isEmpty else { return }
         for (id, action) in stickies {
             release(action)
@@ -199,13 +222,13 @@ public final class ControlsRuntime {
         stickies = [:]
     }
 
-    private func press(_ action: ControlAction) {
+    func press(_ action: ControlAction) {
         let count = downCounts[action, default: 0]
         downCounts[action] = count + 1
         if count == 0 { send(action, down: true) }
     }
 
-    private func release(_ action: ControlAction) {
+    func release(_ action: ControlAction) {
         guard let count = downCounts[action] else { return }
         if count > 1 {
             downCounts[action] = count - 1
@@ -223,6 +246,7 @@ public final class ControlsRuntime {
             winios_post_key(Int32(vk), down ? 1 : 0)
             fputs(String(format: "[controls] key 0x%02X %@\n", vk, down ? "down" : "up"), stderr)
         case .mouse(let button):
+            flushMotion()   // clicks where a trackpad has just put the cursor
             let flags: UInt32 = switch button {
             case .left: down ? 0x0002 : 0x0004
             case .right: down ? 0x0008 : 0x0010
@@ -270,15 +294,24 @@ public final class ControlsInputView: UIView {
 
     public override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         for touch in touches {
-            guard let hit = runtime.control(at: touch.location(in: self)),
-                  let record = runtime.began(hit.control, key: hit.key) else { continue }
-            touchesOnControls[ObjectIdentifier(touch)] = record
+            let point = touch.location(in: self), finger = ObjectIdentifier(touch)
+            guard let hit = runtime.control(at: point),
+                  let record = runtime.began(hit.control, key: hit.key, finger: finger, at: point) else { continue }
+            touchesOnControls[finger] = record
+        }
+    }
+
+    public override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+        for touch in touches {
+            let finger = ObjectIdentifier(touch)
+            if let record = touchesOnControls[finger] { runtime.moved(record, finger: finger, to: touch.location(in: self)) }
         }
     }
 
     public override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         for touch in touches {
-            if let record = touchesOnControls.removeValue(forKey: ObjectIdentifier(touch)) { runtime.ended(record) }
+            let finger = ObjectIdentifier(touch)
+            if let record = touchesOnControls.removeValue(forKey: finger) { runtime.ended(record, finger: finger) }
         }
     }
 

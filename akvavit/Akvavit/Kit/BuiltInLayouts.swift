@@ -43,8 +43,9 @@ public enum BuiltInLayouts {
     public static let shooterTrackpads = ControlLayout(
         id: "builtin.shooterTrackpads", name: "Shooter, trackpads",
         controls: [
-            Control(.trackpad(ControlTrackpad(.move)), Placement(.start, 24, .end, 24, width: 260, height: 300)),
-            Control(.trackpad(ControlTrackpad(.aim)), Placement(.end, 24, .start, 24, width: 300, height: 230)),
+            // Fire, Jump and Crouch lie over the aim pad; buttons come first.
+            Control(.trackpad(ControlTrackpad(.move)), Placement(.start, 16, .end, 16, width: 300, height: 340)),
+            Control(.trackpad(ControlTrackpad(.aim)), Placement(.end, 16, .end, 16, width: 340, height: 300)),
             Control(.button(ControlButton(.mouse(.left), label: "Fire", colour: .red)),
                     Placement(.end, 24, .end, 16, width: 80, height: 80)),
             Control(.button(ControlButton(.key(VirtualKey.space), label: "Jump")),

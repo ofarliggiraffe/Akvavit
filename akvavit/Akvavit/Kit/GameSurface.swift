@@ -194,6 +194,7 @@ public final class GameSurfaceView: UIView {
         guard controls.touchAsMouse else { return }
         let (x, y) = windowsPoint(point)
         winios_pointer(x, y, flags | MouseFlags.absolute | MouseFlags.move, data)
+        controls.pointerMoved(toX: x, y: y)
         if flags & (MouseFlags.leftUp | MouseFlags.rightUp | MouseFlags.middleUp) != 0 {
             controls.mouseButtonReleased()
         }
