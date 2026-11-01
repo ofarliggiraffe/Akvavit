@@ -6,6 +6,14 @@ on top. The first game is **Railroad Tycoon 3**, and the device is an **iPhone
 Duo**. Personal details (device, team, accounts) are in `CLAUDE.local.md`,
 which is git-ignored.
 
+There are two apps (since 2026-11-01):
+- **Akvavit's own app** (`akvavit/Akvavit`, shown as "Akvavit"). Our code, on
+  Madeira's engine. This is where the work goes.
+- **Madeira's app** (`app/`, shown as "Madeira"). Madeira's app with our
+  hooks, kept for comparison.
+
+Both can be installed side by side. See "Akvavit's own app" below.
+
 ## The repository is public: nothing personal goes in it
 
 - No names, usernames, email addresses, team IDs, bundle-ID prefixes, device
@@ -51,19 +59,23 @@ which is git-ignored.
 - Keep changes to Madeira's files small, so merges stay easy. Put the logic in
   new files under `akvavit/`, and only hook them in from Madeira's files, with
   an `Akvavit:` comment at each hook.
-- Keep Madeira's names (project, targets, scheme `Madeira`, `Madeira.app`);
-  only the display name is Akvavit. Renaming them would conflict on every
-  merge of `project.pbxproj`.
+- Keep Madeira's names (project, targets, scheme `Madeira`, `Madeira.app`).
+  Renaming them would conflict on every merge of `project.pbxproj`. Its
+  display name is "Madeira" again (it was "Akvavit" until 2026-11-01), so it
+  can be told apart from our own app on the device.
 - `akvavit/App` (app files), `akvavit/Tunnel` (the tunnel extension, target
   `AkvavitTunnel`). New files are added in Xcode (the project file is ours to
   edit now). Project paths to them start with `../akvavit/`.
-- `app/Signing.xcconfig`: the project's base configuration (team and bundle
-  ID placeholders, then `#include? "Signing.local.xcconfig"`). The project
-  file must not set `DEVELOPMENT_TEAM` or `MADEIRA_BUNDLE_IDENTIFIER` itself.
+- `app/Signing.xcconfig`: the base configuration of both projects (team and
+  bundle ID placeholders, then `#include? "Signing.local.xcconfig"`).
+  `MADEIRA_BUNDLE_IDENTIFIER` is Madeira's app's; `AKVAVIT_APP_BUNDLE_IDENTIFIER`
+  is our own app's (`APP_BUNDLE_ID` in `local.config`, default `BUNDLE_ID` +
+  `.app`). The project file must not set `DEVELOPMENT_TEAM` or the bundle IDs itself.
   Xcode writes `DEVELOPMENT_TEAM` into a target when a team is picked in
   Signing & Capabilities, so don't pick one there, and remove it if it appears.
 - `akvavit/scripts/setup.sh`: hooks, the `upstream` remote, submodules,
-  `Signing.local.xcconfig`, privacy check. Safe to re-run.
+  `Signing.local.xcconfig`, our app's Xcode project (XcodeGen), privacy
+  check. Safe to re-run.
 - `akvavit/scripts/build-native.sh`: Madeira's `tools/build-ipa.sh` minus
   packaging, with our build fixes, then `build-stikjit.sh`. Logs go to
   `.build/logs/`.
@@ -82,8 +94,102 @@ which is git-ignored.
 - `wine`: points to `ofarliggiraffe/wine`, branch `akvavit` (Madeira's pinned
   Wine from `willfaust/wine` `madeira-lgpl`, plus our commits). In `wine/`,
   `origin` = our fork, `upstream` = `willfaust/wine`. FEX, dxmt and
-  madeira-dock stay on Madeira's forks. Never change FEX (see Decisions).
+  madeira-dock stay on Madeira's forks. FEX changes only with the user's OK
+  (see Decisions).
 - `MADEIRA.md` is Madeira's README (renamed; `README.md` is ours).
+
+## Akvavit's own app (`akvavit/Akvavit`)
+
+- **XcodeGen project.** `project.yml` describes it; `Akvavit.xcodeproj` is
+  generated and git-ignored. Run `xcodegen` in `akvavit/Akvavit` after adding,
+  moving or deleting files (folders are listed when generating). A file used
+  by two targets must be in one group only (Xcode refuses the project
+  otherwise). Project-level settings are the ones Madeira's project sets (no
+  XcodeGen presets), so Madeira's files compile the same way. Device only.
+- **Targets:**
+  - `Akvavit`: the app, interface only (`App/`).
+  - `AkvavitKit`: our engine layer (`Kit/`), a *static* framework, so
+    everything links into the app binary as in Madeira (Madeira's address-space
+    code depends on the app's memory layout). The app force-loads it: DXMT and
+    Wine look up some symbols at run time (`macdrv_functions`).
+  - `AkvavitTunnel`: our VPN extension, shared with Madeira's project.
+  - `AkvavitJITHelper`: Madeira's helper, built as `MadeiraJITHelper.appex`,
+    the name Madeira's host code looks for.
+- **Madeira's C interface** is a Clang module (`Kit/Engine/module.modulemap`
+  over Madeira's bridging header). All of AkvavitKit's Swift sees it without an
+  import (`-Xfrontend -import-module MadeiraEngine`); that is how Madeira's
+  Swift files compile there unchanged. Frameworks can't have a bridging header.
+- **AkvavitKit's public API**, which the interface uses:
+  - `AkvavitEngine.start()`;
+  - `JIT` (pairing, VPN, check, enable);
+  - `Session` with `LaunchConfig` (`.direct`, `.desktop`, `.steam(appID:)`),
+    plus `quit()`;
+  - `Steam` (sign-in, games, downloads, Valve's client files);
+  - `GameSurfaceView` (picture and touch as mouse);
+  - `GameOverlay` (interface above the picture).
+- **Build and install:** open `akvavit/Akvavit/Akvavit.xcodeproj` in the user's
+  Xcode window (not one the tools open in the background: that one has no
+  Apple account and falls back to the wildcard profile). Scheme `Akvavit`,
+  device re-selected before each build. The product is `Akvavit.app` in
+  DerivedData `Akvavit-*/Build/Products/Debug-iphoneos`. Install with
+  `devicectl device install app`, as for Madeira. Its data container uses our
+  app's bundle ID. Pairing, Steam sign-in and the prefix are its own.
+- **What a launch needs from Madeira's engine** (`Kit/Session.swift`; the rest
+  of Madeira's ~750-line launch is optional settings, experiments and
+  diagnostics):
+  1. the JIT pool (`StikJITHelper.allocatePool`), passed on as `WINE_IOS_JIT_*`;
+  2. the debugger detached at once;
+  3. `wineserver_start`, waiting for `wineserver_is_ready`;
+  4. `wine_process_start` with the program in `MADEIRA_EXE`/`MADEIRA_ARGS`.
+
+  Wine seeds a new prefix from the template itself.
+- **Windows' desktop** (`explorer.exe /desktop=shell,WxH <command>`) starts
+  *one* command line. A program replaces `services.exe` there, it isn't
+  appended (Wine starts the services itself). Dock's start does the same.
+- **Dock starts** (`Kit/DockStart.swift`):
+  1. close our own Steam connection first (one sign-in of an account online);
+  2. the one-use sign-in transfer and the game (`MadeiraDock.writeHandoff`,
+     `configure`, launch option 0);
+  3. one-time installs (`DockInstallers.prepare`; a session may run only those);
+  4. `MADEIRA_DOCK_SESSION`, `MADEIRA_CAGE_RELEASE` and
+     `MADEIRA_GDI_SHARED_SECTION` (32-bit games).
+- **The picture** (`GameLayerHost`) is a raw view on the window, *above* the
+  interface. Anything to draw over a game goes in `GameOverlay`'s window. In
+  SwiftUI there, a tap on a button and on empty space report the same view.
+  So the overlay takes all touches (a menu), or only points the interface
+  claims (controls); it can't tell by itself.
+- **Touch as mouse** in our app:
+  - a tap clicks;
+  - a hold of 0.25 s, or a drag past 10 pt, holds the left button from the
+    start point;
+  - a two- or three-finger tap is a right or middle click;
+  - a two-finger drag is the wheel (20 pt a notch);
+  - a four-finger tap is the test menu.
+
+  The user found it works better than in Madeira (where hold never worked
+  for them).
+- **Logs:** `Documents/madeira-log.txt` copies empty while a game runs, but
+  the hard links in `Documents/logs/` copy fine. Our lines are tagged
+  `[session]` (with `fps` every 10 s), `[touch]` and `[akvavit-steam]`.
+  The engine's `[xp]` lines (every 250 ms) carry the time, CPU split across
+  fast and slow cores, and disk reads, which is enough to compare loading phases.
+- **Verified 2026-11-01** on the Duo:
+  - JIT with its own pairing ("Pair with Akvavit");
+  - the Direct3D cube, and Windows' desktop with Wine's settings;
+  - Steam sign-in, Valve's client files, and RT2 downloaded (669 MB in 8 s);
+  - RT2 and RT3 through Dock, RT3 at 60 FPS with reduced-precision x87 (its
+    texture glitches as in Madeira); loading felt faster than in Madeira, but
+    the user measured it as about the same;
+  - fold/unfold, and the test menu with Quit.
+- **Open:**
+  - Quit should end the game and return to the app rather than close it
+    (wait for Wine to stop, then show the app; a second game still needs a
+    restart). Madeira can't quit a game either. It belongs with the real
+    in-game menu.
+  - Launch options other than Steam's first.
+  - Per-game settings files.
+  - Background downloads.
+  - On-screen controls and keyboard: with the real interface.
 
 ## Updating Madeira
 
@@ -103,13 +209,28 @@ through Dock at 60 FPS, RT2, Portal).
 
 ## Decisions
 
-- **Keep Madeira's iOS app** and change it minimally. Rewriting it would bring
-  back input and Wine-startup bugs it has already fixed.
-- **FEX stays untouched.** FEX-Emu doesn't accept AI-generated code; don't
-  write FEX code without asking the user. A FEX change would live only in our
-  own fork of it, carried across every update. The user would consider it if
-  more games need what only FEX can provide (first case: hardware breakpoints
-  for AoE II DE, see below); raise it then.
+- **Our own app on Madeira's engine** (2026-11-01, replacing "keep Madeira's
+  app"). The user wants something of their own, and found many problems came
+  from Madeira's app.
+  - **No copying Madeira.** Our app is our own design and code. Madeira's
+    files are only *used*, compiled from where they are, never copied.
+  - **`akvavit/Akvavit/PROVENANCE.md` is the strict list** of what is ours and
+    what is Madeira's. Keep it exact with every change.
+  - **Madeira's components stay for now** and may be replaced later: the
+    native engine and glue, the JIT helper, SwiftSteam, Dock.
+  - **Madeira's engine-side Swift is compiled in temporarily** (JIT flow,
+    Dock helpers, log, config), behind AkvavitKit's API. It is to be replaced
+    piece by piece, each checked against the version that works.
+- **The user designs the interface.** Don't design or build real screens.
+  Everything in `App/Test/` is temporary test screens for checking AkvavitKit.
+  The real interface comes later, designed with the user, and is then wired to
+  AkvavitKit. The planned in-game menu holds things like controls and Quit.
+- **FEX changes are the user's call** (an earlier note here called FEX
+  untouchable; the user never set that rule). Upstream FEX-Emu doesn't accept
+  AI-generated code (unverified), which only matters for sending changes
+  upstream. A change would live in our own fork of FEX, carried across every
+  update. Ask before writing FEX code. The first candidate case is the
+  hardware breakpoints for AoE II DE (see below).
 - **JIT, with nothing prebuilt from outside:**
   - our own loopback packet-tunnel extension inside the app, replacing
     LocalDevVPN. The app starts it when enabling JIT and stops it once the
@@ -440,8 +561,8 @@ through Dock at 60 FPS, RT2, Portal).
 - FEX's 32-bit side creates an empty `unix/var/mobile/Containers/Data/
   Application/<id>/Documents/wine/.config/fex-emu/AppConfig` tree in the
   working directory of a 32-bit program (the game's folder) at each app
-  install. Harmless, but untidy; not fixed yet (FEX stays untouched; a valid
-  config path from outside would be the way).
+  install. Harmless, but untidy; not fixed yet (a valid config path from
+  outside would avoid a FEX change).
 
 ## Build gotchas
 
@@ -490,11 +611,11 @@ through Dock at 60 FPS, RT2, Portal).
 
 ## Toolchain
 
-- Xcode 27.1 (iOS 27.1 SDK), with Homebrew, cmake, ninja, meson and Rust
-  (Homebrew rustup).
+- Xcode 27.2 (iOS 27.2 SDK, since 2026-11-01), with Homebrew, cmake, ninja,
+  meson, Rust (Homebrew rustup) and XcodeGen.
 - Build with the Xcode MCP tools (`BuildProject`), not `xcodebuild`. Re-select
-  the **Madeira** scheme and the device before every build, and check the
-  built binary's timestamp before installing.
+  the scheme (**Akvavit**, or **Madeira** for Madeira's app) and the device
+  before every build, and check the built binary's timestamp before installing.
 - Install without launching:
   `xcrun devicectl device install app --device <UDID> <path>.app`
 - Crash reports: `xcrun devicectl device info files --device <UDID>
@@ -506,3 +627,8 @@ through Dock at 60 FPS, RT2, Portal).
 - They test on the device themselves and send screenshots. Ask them to
   report exactly what they see.
 - They prefer discussing before large or architectural changes.
+- They design the user interface themselves (see Decisions); until then, only
+  bare test screens.
+- Time estimates: they found earlier ones far too high for writing code
+  ("days" took an hour or two). Estimate in hours of sessions, and say that
+  device rounds and unknowns, not code, take the time.

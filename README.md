@@ -14,8 +14,7 @@ Madeira's own README, which explains how it works, is in [MADEIRA.md](MADEIRA.md
 
 ## What Akvavit changes
 
-- Builds and signs the app with your own developer account and bundle ID, and
-  names it Akvavit.
+- Builds and signs the app with your own developer account and bundle ID.
 - Works around build problems on a current Mac (Python version for Mesa,
   Homebrew's Rust).
 - **JIT without other apps:** a loopback VPN built into the app
@@ -62,8 +61,19 @@ Planned:
 
 - **Older Direct3D and DirectDraw:** open-source wrappers such as d3d8to9 and
   cnc-ddraw, built from source, bundled and applied per game automatically.
-- **Foldable support** for the iPhone Duo: resize when folding and unfolding,
-  and moving between the two displays.
+
+## Akvavit's own app (work in progress)
+
+`akvavit/Akvavit` is a new app of Akvavit's own, built on Madeira's engine:
+FEX-Emu, Wine and DXMT as Madeira ported them to iOS, with Madeira Dock and
+Madeira's Steam library. It installs next to Madeira's app, which is kept for
+comparison. Its screens are temporary test screens for now: JIT setup, Steam
+sign-in and downloads, and starting games through Dock. Railroad Tycoon II and
+3 run in it, and the picture follows folding and unfolding the iPhone Duo.
+
+Akvavit's own code is written for it; Madeira's code is used where it is,
+never copied. [`akvavit/Akvavit/PROVENANCE.md`](akvavit/Akvavit/PROVENANCE.md)
+lists exactly what is Akvavit's and what is Madeira's.
 
 ## Requirements
 
@@ -87,9 +97,15 @@ akvavit/scripts/setup.sh               # hooks, submodules, signing settings
 akvavit/scripts/build-native.sh        # about an hour the first time
 ```
 
-Then open `app/Madeira.xcodeproj` in Xcode, choose the **Madeira** scheme and
-your device, and build. Use the Debug configuration: Madeira's docs say Release
-builds have crashed games.
+Then build in Xcode, in the Debug configuration (Madeira's docs say Release
+builds have crashed games):
+
+- **Akvavit's own app:** open `akvavit/Akvavit/Akvavit.xcodeproj` (`setup.sh`
+  generates it from `project.yml` with XcodeGen), choose the **Akvavit** scheme
+  and your device. Its bundle ID is `APP_BUNDLE_ID` in `local.config`, or
+  `BUNDLE_ID` with `.app` appended.
+- **Madeira's app:** open `app/Madeira.xcodeproj`, choose the **Madeira** scheme
+  and your device.
 
 Don't use the app's Settings › Signing to re-sign it. It sends your Apple ID
 through third-party servers. A build from Xcode with a paid account is valid

@@ -18,6 +18,9 @@ public struct LaunchConfig: Sendable {
         case direct(executable: String, arguments: String = "", workingFolder: String? = nil)
         /// Windows' desktop (explorer), which then starts `executable`, if given.
         case desktop(executable: String? = nil)
+        /// An installed Steam game, started by Valve's client through Madeira
+        /// Dock (on Windows' desktop). Arguments are added to Steam's own.
+        case steam(appID: Int, arguments: String = "")
     }
 
     public var program: Program
@@ -39,9 +42,10 @@ public struct LaunchConfig: Sendable {
         self.extraEnvironment = extraEnvironment
     }
 
+    /// The session runs on Windows' desktop (explorer).
     var isDesktop: Bool {
-        if case .desktop = program { return true }
-        return false
+        if case .direct = program { return false }
+        return true
     }
 
     var displayName: String {
@@ -50,6 +54,8 @@ public struct LaunchConfig: Sendable {
             return executable.split(whereSeparator: { $0 == "\\" || $0 == "/" }).last.map(String.init) ?? executable
         case .desktop(let executable):
             return executable.map { "Desktop (\($0))" } ?? "Desktop"
+        case .steam(let appID, _):
+            return "Steam \(appID)"
         }
     }
 }
@@ -72,6 +78,11 @@ public final class Session {
     public private(set) var framesPresented: UInt64 = 0
     /// The current session's config (or the last one's).
     public private(set) var config: LaunchConfig?
+    /// What Madeira Dock reports went wrong in a Steam start (Valve's client
+    /// refused, no license, no connection), while the session still runs.
+    public private(set) var dockProblem: String?
+    @ObservationIgnored private var dockWatch: Timer?
+    @ObservationIgnored private var installsOnly = false
 
     /// A session already ran in this app run; another needs a restart.
     public var needsRestart: Bool { state != .idle }
@@ -104,7 +115,30 @@ public final class Session {
         LogStore.shared.log("[session] start \(config.displayName) screen=\(config.screenWidth)x\(config.screenHeight) "
                             + "x87-reduced=\(config.reducedPrecisionX87 ? 1 : 0)")
 
-        let environment = Self.environment(for: config)
+        guard case .steam(let appID, let arguments) = config.program else {
+            launch(config, environment: Self.environment(for: config))
+            return
+        }
+        state = .starting("Handing over to Steam")
+        Task {
+            do {
+                let dock = try await DockStart.prepare(appID: appID, arguments: arguments,
+                                                       width: config.screenWidth, height: config.screenHeight)
+                installsOnly = dock.installsOnly
+                var environment = Self.environment(for: config)
+                environment.merge(dock.environment) { _, dock in dock }
+                for (name, value) in config.extraEnvironment { environment[name] = .some(value) }
+                launch(config, environment: environment)
+                watchDock()
+            } catch {
+                LogStore.shared.log("[session] Dock not started: \(error.localizedDescription)", level: .error)
+                DockStart.finish()
+                state = .ended(error.localizedDescription)
+            }
+        }
+    }
+
+    private func launch(_ config: LaunchConfig, environment: [String: String?]) {
         for (name, value) in environment.sorted(by: { $0.key < $1.key }) {
             if let value { setenv(name, value, 1) } else { unsetenv(name) }
         }
@@ -139,6 +173,8 @@ public final class Session {
             "MTL_HUD_INSIGHTS_ENABLED": "0",
             // Controllers as Windows.Gaming.Input gamepads too.
             "MADEIRA_WGI_HOST_PADS": "1",
+            // Not used yet: no per-game settings files.
+            "MADEIRA_CFG_GAME": nil,
         ]
         switch config.program {
         case .direct(let executable, let arguments, let workingFolder):
@@ -156,7 +192,11 @@ public final class Session {
             env["MADEIRA_ARGS"] = .some(arguments)
             env["MADEIRA_WORKDIR"] = .some(nil)
             env["MADEIRA_DESKTOP"] = .some("1")
+        case .steam:
+            // DockStart.prepare supplies the program and Dock's variables.
+            env["MADEIRA_WORKDIR"] = .some(nil)
         }
+        for name in DockStart.variables where env[name] == nil { env[name] = .some(nil) }
         for (name, value) in config.extraEnvironment { env[name] = .some(value) }
         return env
     }
@@ -214,14 +254,24 @@ public final class Session {
         }
         report(.running)
 
-        // 5. Until the program ends.
+        // 5. Until the program ends. Every 10 s the frame rate goes to the log.
         var lastFrames: UInt64 = 0
+        var rateFrames: UInt64 = 0
+        var rateSince = Date()
         while wine_process_is_running() != 0 {
             Thread.sleep(forTimeInterval: 0.25)
             let frames = madeira_frame_count()
             if frames != lastFrames {
                 lastFrames = frames
                 report(.frames(frames))
+            }
+            let elapsed = Date().timeIntervalSince(rateSince)
+            if elapsed >= 10 {
+                if frames > rateFrames {
+                    fputs(String(format: "[session] fps %.1f\n", Double(frames - rateFrames) / elapsed), stderr)
+                }
+                rateFrames = frames
+                rateSince = Date()
             }
         }
         var status: UInt32 = 0
@@ -236,6 +286,37 @@ public final class Session {
         if let value { setenv(name, value, 1) } else { unsetenv(name) }
     }
 
+    /// Ends the session and closes the app (Windows can start once per app run).
+    /// A desktop session (Steam games too) is asked to close first, and Wine
+    /// gets up to 10 s to stop, so the registry is written; then the app exits.
+    /// What the game had not saved is lost.
+    public func quit() {
+        LogStore.shared.log("[session] quit")
+        guard wine_process_is_running() != 0 || wineserver_is_running() != 0 else { exit(0) }
+        if config?.isDesktop == true { winios_close_desktop() }
+        if case .steam = config?.program { DockStart.finish() }
+        Thread.detachNewThread {
+            let start = Date()
+            while wine_process_is_running() != 0 || wineserver_is_running() != 0, Date().timeIntervalSince(start) < 10 {
+                Thread.sleep(forTimeInterval: 0.1)
+            }
+            fputs(String(format: "[session] exit after %.1f s (wine=%d server=%d)\n", Date().timeIntervalSince(start),
+                         wine_process_is_running(), wineserver_is_running()), stderr)
+            exit(0)
+        }
+    }
+
+    /// Reads Madeira Dock's report each second while a Steam start runs.
+    private func watchDock() {
+        dockWatch = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, let problem = MadeiraDock.pollReport().failure, self.dockProblem != problem else { return }
+                self.dockProblem = problem
+                LogStore.shared.log("[session] Dock: \(problem)", level: .error)
+            }
+        }
+    }
+
     private func apply(_ update: Update) {
         switch update {
         case .step(let what): state = .starting(what)
@@ -243,7 +324,15 @@ public final class Session {
             state = .running
             GameLayerHost.shared.isHidden = false
         case .frames(let count): framesPresented = count
-        case .ended(let reason):
+        case .ended(var reason):
+            dockWatch?.invalidate()
+            if case .steam = config?.program {
+                if reason == nil, let problem = dockProblem { reason = problem }
+                if reason == nil, installsOnly {
+                    reason = "Steam's one-time installs for this game are done. Close Akvavit, open it again and start the game."
+                }
+                DockStart.finish()
+            }
             state = .ended(reason)
             // The picture sits above the interface: it goes with the session.
             GameLayerHost.shared.isHidden = true

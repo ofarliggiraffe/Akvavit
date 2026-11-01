@@ -11,46 +11,8 @@ struct AkvavitApp: App {
 
     var body: some Scene {
         WindowGroup {
-            HomeView()
-        }
-    }
-}
-
-struct HomeView: View {
-    @State private var showingGame = false
-
-    var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    NavigationLink {
-                        JITSetupView()
-                    } label: {
-                        JITStatusRow()
-                    }
-                }
-                TryOutSection(showingGame: $showingGame)
-                Section {
-                    NavigationLink("About Akvavit") { AboutView() }
-                }
-            }
-            .navigationTitle("Akvavit")
-        }
-        .fullScreenCover(isPresented: $showingGame) { GameScreen() }
-    }
-}
-
-struct JITStatusRow: View {
-    private let jit = JIT.shared
-
-    var body: some View {
-        LabeledContent("JIT") {
-            if jit.busy {
-                ProgressView()
-            } else {
-                Text(jit.isOn ? "On" : "Off")
-                    .foregroundStyle(jit.isOn ? .green : .secondary)
-            }
+            // Temporary: test screens (Test/) until the real interface exists.
+            TestHome()
         }
     }
 }

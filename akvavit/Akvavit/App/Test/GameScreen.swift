@@ -7,8 +7,29 @@ import AkvavitKit
 import SwiftUI
 
 struct GameSurface: UIViewRepresentable {
-    func makeUIView(context: Context) -> GameSurfaceView { GameSurfaceView() }
+    func makeUIView(context: Context) -> GameSurfaceView {
+        let view = GameSurfaceView()
+        // Test only: four fingers open the test menu over the game.
+        view.onFourFingerTap = { GameOverlay.show(UIHostingController(rootView: TestGameMenu())) }
+        return view
+    }
     func updateUIView(_ view: GameSurfaceView, context: Context) {}
+}
+
+/// TEMPORARY in-game test menu, shown in the overlay window above the game.
+struct TestGameMenu: View {
+    var body: some View {
+        VStack(spacing: 12) {
+            Text("Test menu").font(.headline)
+            Button("Back to game") { GameOverlay.hide() }
+                .buttonStyle(.bordered)
+            Button("Quit (closes Akvavit)", role: .destructive) { Session.shared.quit() }
+                .buttonStyle(.borderedProminent)
+        }
+        .padding(24)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
 }
 
 struct GameScreen: View {
@@ -19,7 +40,13 @@ struct GameScreen: View {
             GameSurface().ignoresSafeArea()
             switch session.state {
             case .idle, .running:
-                EmptyView()
+                if let problem = session.dockProblem {
+                    Text(problem)
+                        .padding(12)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                        .padding()
+                        .frame(maxHeight: .infinity, alignment: .top)
+                }
             case .starting(let step):
                 VStack(spacing: 12) {
                     ProgressView().tint(.white)
@@ -57,7 +84,7 @@ struct TryOutSection: View {
                 start(LaunchConfig(program: .direct(executable: "cube.exe")))
             }
             Button("Windows desktop with Wine's settings") {
-                let (w, h) = desktopSize()
+                let (w, h) = Self.desktopSize()
                 start(LaunchConfig(program: .desktop(executable: "winecfg.exe"), screenWidth: w, screenHeight: h))
             }
         } header: {
@@ -79,7 +106,7 @@ struct TryOutSection: View {
 
     /// A landscape desktop 768 pixels high, in the shape of this window (the
     /// display the app is on: the Duo's inner and outer ones differ).
-    private func desktopSize() -> (Int, Int) {
+    static func desktopSize() -> (Int, Int) {
         let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
         let size = scene?.effectiveGeometry.coordinateSpace.bounds.size ?? CGSize(width: 4, height: 3)
         let aspect = max(size.width, size.height) / max(min(size.width, size.height), 1)

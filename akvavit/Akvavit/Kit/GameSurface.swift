@@ -72,6 +72,9 @@ private enum MouseFlags {
 }
 
 public final class GameSurfaceView: UIView {
+    /// A tap with four fingers: not passed to the game, but to this.
+    public var onFourFingerTap: (() -> Void)?
+
     private var observers: [NSObjectProtocol] = []
     private var drawableWatch: NSKeyValueObservation?
 
@@ -282,6 +285,8 @@ public final class GameSurfaceView: UIView {
             } else if count == 3 {
                 send(start, MouseFlags.middleDown)
                 send(start, MouseFlags.middleUp)
+            } else if count == 4 {
+                onFourFingerTap?()
             }
         case .fingers, .none:
             break
