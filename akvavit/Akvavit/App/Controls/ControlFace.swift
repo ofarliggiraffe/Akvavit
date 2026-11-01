@@ -33,12 +33,6 @@ struct ControlsCanvas: View {
     }
 }
 
-private extension Control {
-    var isTrackpad: Bool {
-        if case .trackpad = kind { true } else { false }
-    }
-}
-
 struct ControlFace: View {
     let control: Control
     let state: ControlState?

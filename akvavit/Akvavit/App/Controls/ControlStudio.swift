@@ -5,7 +5,11 @@
 // Floating on it: back and the layout's name at the top left, and for your
 // own layouts a "…" with the layout's settings (touch on the game, haptics,
 // delete). A built-in layout can't change; the bar at the bottom makes a copy,
-// which opens here at once with its name ready to type over.
+// which opens here at once with its name ready to type over. Your layouts
+// have the tool bar there instead: snap to grid and its spacing, and Mirror
+// (on narrow displays a shorter bar, as the phone board shows). Both bars sit along the top, out of the way of the
+// controls, which mostly go at the bottom (the user's choice). While a finger
+// is on a control, the bars all but disappear.
 
 import AkvavitKit
 import SwiftUI
@@ -28,6 +32,9 @@ struct ControlStudio: View {
     @FocusState private var naming: Bool
     @State private var showingMenu = false
     @State private var confirmingDelete = false
+    @State private var model = StudioModel()
+    /// A narrow display: the shorter tool bar.
+    @State private var compact = false
     private let close: () -> Void
     private let store = ControlLayoutStore.shared
 
@@ -41,17 +48,28 @@ struct ControlStudio: View {
     var body: some View {
         // The whole display, as over a game.
         GeometryReader { proxy in
+            let area = CGRect(origin: .zero, size: proxy.size)
             ZStack(alignment: .topLeading) {
-                StudioBackground()
+                StudioBackground(spacing: model.snaps ? model.spacing : nil)
                 if let layout {
-                    ControlsCanvas(layout: layout, area: CGRect(origin: .zero, size: proxy.size))
+                    if layout.isBuiltIn {
+                        ControlsCanvas(layout: layout, area: area)
+                    } else {
+                        StudioEditor(layout: layout, area: area, model: model, save: store.update)
+                    }
                 }
             }
         }
         .ignoresSafeArea()
-        .overlay(alignment: .topLeading) { topBar }
-        .overlay(alignment: .bottomLeading) {
-            if layout?.isBuiltIn == true { builtInBar }
+        .onGeometryChange(for: Bool.self) { $0.size.width < 900 } action: { compact = $0 }
+        .overlay(alignment: .top) {
+            HStack(alignment: .top, spacing: 12) {
+                floating(topBar)
+                Spacer(minLength: 0)
+                if let layout { floating(layout.isBuiltIn ? AnyView(builtInBar) : AnyView(toolBar)) }
+            }
+            .padding(.horizontal, compact ? 16 : 24)
+            .padding(.top, compact ? 14 : 18)
         }
         .statusBarHidden()
         .persistentSystemOverlays(.hidden)
@@ -73,6 +91,47 @@ struct ControlStudio: View {
 
     // MARK: Floating parts
 
+    /// Floating parts all but disappear while a finger is on a control.
+    private func floating(_ part: some View) -> some View {
+        part
+            .opacity(model.isInteracting ? 0.15 : 1)
+            .allowsHitTesting(!model.isInteracting)
+            .animation(.easeOut(duration: 0.15), value: model.isInteracting)
+    }
+
+    private var toolBar: some View {
+        @Bindable var model = model
+        return HStack(spacing: compact ? 10 : 12) {
+            Text(compact ? "Grid" : "Snap to grid")
+                .font(.quicksand(13, .bold, relativeTo: .footnote))
+                .foregroundStyle(Theme.outlineText)
+                .padding(.leading, 6)
+            Toggle("Snap to grid", isOn: $model.snaps)
+                .labelsHidden()
+                .tint(Theme.controlsColors.tint)
+            if !compact {
+                NotchedSlider(values: StudioModel.spacings, value: $model.spacing)
+                    .frame(width: 110)
+                    .opacity(model.snaps ? 1 : 0.4)
+                    .disabled(!model.snaps)
+                    .accessibilityLabel("Grid spacing")
+                Text("\(Int(model.spacing)) pt")
+                    .font(.quicksand(13, .bold, relativeTo: .footnote))
+                    .foregroundStyle(StudioColors.secondaryInk)
+                    .monospacedDigit()
+            }
+            Button(compact ? "Mirror" : "Mirror sides", action: mirror)
+                .buttonStyle(ChipButtonStyle(compact: compact))
+        }
+        .padding(.horizontal, 8)
+        .frame(height: compact ? 44 : 52)
+        .background(StudioColors.floating, in: .capsule)
+        .shadow(color: .black.opacity(0.35), radius: 12, y: 10)
+    }
+
+    /// The round buttons' size (the phone board's are smaller).
+    private var round: CGFloat { compact ? 40 : 44 }
+
     private var topBar: some View {
         HStack(spacing: 8) {
             Button {
@@ -82,7 +141,7 @@ struct ControlStudio: View {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 16, weight: .bold))
                     .foregroundStyle(Theme.outlineText)
-                    .frame(width: 44, height: 44)
+                    .frame(width: round, height: round)
                     .background(StudioColors.floating, in: .circle)
             }
             .accessibilityLabel("Back to Controls")
@@ -93,12 +152,12 @@ struct ControlStudio: View {
                     .onSubmit { saveName() }
                     .textInputAutocapitalization(.sentences)
                     .autocorrectionDisabled()
-                    .modifier(NamePill())
+                    .modifier(NamePill(compact: compact))
                 Button { showingMenu = true } label: {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 16, weight: .bold))
                         .foregroundStyle(Theme.outlineText)
-                        .frame(width: 44, height: 44)
+                        .frame(width: round, height: round)
                         .background(StudioColors.floating, in: .circle)
                 }
                 .accessibilityLabel("Layout settings")
@@ -114,12 +173,10 @@ struct ControlStudio: View {
             } else {
                 Text(layout?.name ?? "")
                     .lineLimit(1)
-                    .modifier(NamePill())
+                    .modifier(NamePill(compact: compact))
             }
         }
         .shadow(color: .black.opacity(0.3), radius: 8, y: 6)
-        .padding(.leading, 24)
-        .padding(.top, 18)
     }
 
     private var builtInBar: some View {
@@ -135,14 +192,17 @@ struct ControlStudio: View {
                 .frame(height: 38)
                 .background(Theme.controlsColors.tint, in: .capsule)
         }
-        .padding(7)
+        .padding(compact ? 4 : 7)
         .background(StudioColors.floating, in: .capsule)
         .shadow(color: .black.opacity(0.35), radius: 12, y: 10)
-        .padding(.leading, 24)
-        .padding(.bottom, 18)
     }
 
     // MARK: Actions
+
+    private func mirror() {
+        guard let layout, !layout.isBuiltIn else { return }
+        store.update(StudioModel.mirrored(layout))
+    }
 
     private func makeCopy() {
         guard let layout else { return }
@@ -163,14 +223,16 @@ struct ControlStudio: View {
     }
 }
 
-/// The name, in the white pill of the studio board.
+/// The name, in the white pill of the studio boards.
 private struct NamePill: ViewModifier {
+    let compact: Bool
+
     func body(content: Content) -> some View {
         content
-            .font(.quicksand(17, .bold, relativeTo: .headline))
+            .font(.quicksand(compact ? 15 : 17, .bold, relativeTo: .headline))
             .foregroundStyle(StudioColors.ink)
-            .padding(.horizontal, 14)
-            .frame(width: 210, height: 44, alignment: .leading)
+            .padding(.horizontal, compact ? 12 : 14)
+            .frame(width: compact ? 170 : 210, height: compact ? 40 : 44, alignment: .leading)
             .background(StudioColors.floating, in: .rect(cornerRadius: 12))
     }
 }
@@ -225,22 +287,42 @@ private struct LayoutMenu: View {
     }
 }
 
-/// The game screen's background with the grid's dots.
+/// The game screen's background, with the grid's dots while snapping is on.
+/// The grid is centred on the display, as StudioModel snaps to it.
 private struct StudioBackground: View {
+    let spacing: Double?
+
     var body: some View {
         ZStack {
             StudioColors.background
-            Canvas { context, size in
-                let spacing: CGFloat = 24
-                var dots = Path()
-                for x in stride(from: spacing / 2, to: size.width, by: spacing) {
-                    for y in stride(from: spacing / 2, to: size.height, by: spacing) {
-                        dots.addEllipse(in: CGRect(x: x - 1.2, y: y - 1.2, width: 2.4, height: 2.4))
+            if let spacing {
+                Canvas { context, size in
+                    let step = CGFloat(spacing)
+                    var dots = Path()
+                    for x in stride(from: (size.width / 2).truncatingRemainder(dividingBy: step), through: size.width, by: step) {
+                        for y in stride(from: (size.height / 2).truncatingRemainder(dividingBy: step), through: size.height, by: step) {
+                            dots.addEllipse(in: CGRect(x: x - 1.2, y: y - 1.2, width: 2.4, height: 2.4))
+                        }
                     }
+                    context.fill(dots, with: .color(.white.opacity(0.22)))
                 }
-                context.fill(dots, with: .color(.white.opacity(0.22)))
             }
         }
         .accessibilityHidden(true)
+    }
+}
+
+/// The tool bar's buttons: grey chips.
+private struct ChipButtonStyle: ButtonStyle {
+    let compact: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.quicksand(compact ? 12 : 13, .bold, relativeTo: .footnote))
+            .foregroundStyle(Theme.outlineText)
+            .padding(.horizontal, compact ? 10 : 12)
+            .frame(height: compact ? 36 : 38)
+            .background(StudioColors.chip, in: .capsule)
+            .opacity(configuration.isPressed ? 0.7 : 1)
     }
 }
