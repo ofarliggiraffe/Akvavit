@@ -5,9 +5,10 @@
 // part decodes leniently, so a field or control kind this version doesn't
 // know never loses a layout.
 //
-// Places are in points, measured from the edge (or centre) of the display's
-// safe area that the control is nearest to, so a layout keeps its shape on
-// every iPhone and iPad and across the Duo's two displays.
+// Places are in points, measured from the edge (or centre) of the display
+// that the control is nearest to, so a layout keeps its shape on every iPhone
+// and iPad and across the Duo's two displays. The whole display counts: a game
+// fills it, safe area included (the user's call).
 
 import CoreGraphics
 import Foundation
@@ -79,7 +80,7 @@ public struct Control: Identifiable, Equatable, Sendable {
 // MARK: Places
 
 public struct Placement: Codable, Equatable, Sendable {
-    /// Which edge of the safe area a control is measured from, per axis:
+    /// Which edge of the display a control is measured from, per axis:
     /// left or top (`start`), the middle, right or bottom (`end`).
     public enum Anchor: String, Codable, Sendable {
         case start, center, end
@@ -104,7 +105,7 @@ public struct Placement: Codable, Equatable, Sendable {
         self.height = height
     }
 
-    /// The control's frame in `area` (the safe area). It never leaves the
+    /// The control's frame in `area` (the display). It never leaves the
     /// area: a control larger than the area shrinks to it.
     public func frame(in area: CGRect) -> CGRect {
         let w = min(width, area.width), h = min(height, area.height)

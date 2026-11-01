@@ -105,6 +105,9 @@ struct GameScreen: View {
         }
         .statusBarHidden()
         .persistentSystemOverlays(.hidden)
+        // Windows' screen is landscape, and so are the controls (as in the studio).
+        .onAppear { OrientationLock.lock() }
+        .onDisappear { OrientationLock.unlock() }
         .onChange(of: session.state, initial: true) { _, state in
             switch state {
             case .running: ControlsOverlay.shared.show()

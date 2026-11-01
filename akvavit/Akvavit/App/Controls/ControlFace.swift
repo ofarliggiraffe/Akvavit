@@ -7,11 +7,11 @@
 import AkvavitKit
 import SwiftUI
 
-/// A layout's controls at their places. The canvas fills its parent; `safeArea`
-/// is in the parent's coordinates.
+/// A layout's controls at their places. The canvas fills its parent; `area`
+/// (the display) is in the parent's coordinates.
 struct ControlsCanvas: View {
     let layout: ControlLayout
-    let safeArea: CGRect
+    let area: CGRect
     /// Over a game: trackpads are invisible there (only the studio shows them).
     var inPlay = false
     /// The live state of each control (in play); nil draws it at rest.
@@ -22,9 +22,8 @@ struct ControlsCanvas: View {
             // Trackpads under everything else: buttons over them take the touch.
             ForEach(layout.controls.filter(\.isTrackpad) + layout.controls.filter { !$0.isTrackpad }) { control in
                 if !(inPlay && control.isTrackpad) {
-                    let frame = control.placement.frame(in: safeArea)
-                    ControlFace(control: control, state: state(control.id))
-                        .opacity(control.opacity)
+                    let frame = control.placement.frame(in: area)
+                    ControlFace(control: control, state: state(control.id), opacity: control.opacity)
                         .frame(width: frame.width, height: frame.height)
                         .position(x: frame.midX, y: frame.midY)
                 }
@@ -43,13 +42,17 @@ private extension Control {
 struct ControlFace: View {
     let control: Control
     let state: ControlState?
+    /// The control's opacity. Labels are twice as solid as the rest, so a
+    /// see-through button stays readable.
+    let opacity: Double
 
     var body: some View {
+        let label = min(1, opacity * 2)
         switch control.kind {
-        case .button(let button): ButtonFace(button: button, state: state)
-        case .keyRow(let row): KeyRowFace(row: row, state: state)
-        case .trackpad(let pad): TrackpadFace(pad: pad, state: state)
-        case .stick(let stick): StickFace(stick: stick, state: state)
+        case .button(let button): ButtonFace(button: button, state: state, fill: opacity, label: label)
+        case .keyRow(let row): KeyRowFace(row: row, state: state, fill: opacity, label: label)
+        case .trackpad(let pad): TrackpadFace(pad: pad, state: state).opacity(opacity)
+        case .stick(let stick): StickFace(stick: stick, state: state).opacity(opacity)
         }
     }
 }
@@ -83,6 +86,8 @@ private enum ControlColors {
 struct ButtonFace: View {
     let button: ControlButton
     let state: ControlState?
+    let fill: Double
+    let label: Double
 
     var body: some View {
         GeometryReader { geometry in
@@ -93,9 +98,9 @@ struct ButtonFace: View {
                                          style: .continuous)
             ZStack {
                 if latched {
-                    shape.inset(by: -6).stroke(ControlColors.glow, lineWidth: 3)
+                    shape.inset(by: -6).stroke(ControlColors.glow, lineWidth: 3).opacity(label)
                 }
-                shape.fill(ControlColors.fill(button.colour, down: pressed || latched))
+                shape.fill(ControlColors.fill(button.colour, down: pressed || latched)).opacity(fill)
                 Text(button.title)
                     .font(ControlColors.font(min(17, side * 0.2)))
                     .foregroundStyle(ControlColors.text(button.colour))
@@ -103,11 +108,12 @@ struct ButtonFace: View {
                     .lineLimit(2)
                     .minimumScaleFactor(0.6)
                     .padding(side * 0.1)
+                    .opacity(label)
                 if button.whenTapped == .sticky {
                     Image(systemName: "pin.fill")
                         .font(.system(size: max(side * 0.15, 9)))
                         .foregroundStyle(ControlColors.text(button.colour))
-                        .opacity(latched ? 1 : 0.35)
+                        .opacity((latched ? 1 : 0.35) * label)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                         .padding(side * 0.09)
                 }
@@ -121,6 +127,8 @@ struct ButtonFace: View {
 struct KeyRowFace: View {
     let row: ControlKeyRow
     let state: ControlState?
+    let fill: Double
+    let label: Double
 
     var body: some View {
         GeometryReader { geometry in
@@ -130,11 +138,13 @@ struct KeyRowFace: View {
                 let pressed = state?.pressedKey == index
                 RoundedRectangle(cornerRadius: min(9, frame.height * 0.28), style: .continuous)
                     .fill(Color.white.opacity(pressed ? 1 : 0.82))
+                    .opacity(fill)
                     .overlay {
                         Text(VirtualKey.name(row.keys[index]))
                             .font(ControlColors.font(min(14, frame.height * 0.45)))
                             .foregroundStyle(ControlColors.ink)
                             .minimumScaleFactor(0.5)
+                            .opacity(label)
                     }
                     .scaleEffect(pressed ? 0.9 : 1)
                     .frame(width: frame.width, height: frame.height)

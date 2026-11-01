@@ -33,9 +33,8 @@ public final class ControlsRuntime {
 
     /// The layout over the game; nil until one is chosen.
     public private(set) var layout: ControlLayout?
-    /// The controls' area and the display's safe area in it, in points.
-    public private(set) var bounds = CGRect.zero
-    public private(set) var safeArea = CGRect.zero
+    /// The controls' area (the whole display), in points.
+    public private(set) var area = CGRect.zero
 
     @ObservationIgnored private var states: [UUID: ControlState] = [:]
     @ObservationIgnored private var downCounts: [ControlAction: Int] = [:]
@@ -103,9 +102,10 @@ public final class ControlsRuntime {
         }
     }
 
-    func setArea(bounds: CGRect, safeArea: CGRect) {
-        if self.bounds != bounds { self.bounds = bounds }
-        if self.safeArea != safeArea { self.safeArea = safeArea }
+    func setArea(_ area: CGRect) {
+        guard self.area != area else { return }
+        self.area = area
+        fputs("[controls] area \(Int(area.width))x\(Int(area.height))\n", stderr)
     }
 
     /// A click on the game has been let go: sticky keys go up after it.
@@ -139,13 +139,13 @@ public final class ControlsRuntime {
     /// Buttons and keys over a trackpad come first.
     func control(at point: CGPoint) -> (control: Control, key: Int?)? {
         guard let layout else { return nil }
-        let hits = layout.controls.reversed().filter { $0.placement.frame(in: safeArea).contains(point) }
+        let hits = layout.controls.reversed().filter { $0.placement.frame(in: area).contains(point) }
         for control in hits {
             switch control.kind {
             case .button, .stick:
                 return (control, nil)
             case .keyRow(let row):
-                if let key = row.keyIndex(at: point.x, in: control.placement.frame(in: safeArea)) { return (control, key) }
+                if let key = row.keyIndex(at: point.x, in: control.placement.frame(in: area)) { return (control, key) }
             default:
                 continue
             }
@@ -162,7 +162,7 @@ public final class ControlsRuntime {
             trackpadBegan(control.id, pad, finger: finger, at: point)
             return Touch(control: control.id, role: .trackpad, generation: generation, began: CACurrentMediaTime())
         case .stick(let stick):
-            guard stickBegan(control.id, stick, in: control.placement.frame(in: safeArea), finger: finger, at: point)
+            guard stickBegan(control.id, stick, in: control.placement.frame(in: area), finger: finger, at: point)
             else { return nil }
             return Touch(control: control.id, role: .stick, generation: generation, began: CACurrentMediaTime())
         case .button(let button):
@@ -307,12 +307,7 @@ public final class ControlsInputView: UIView {
 
     public override func layoutSubviews() {
         super.layoutSubviews()
-        runtime.setArea(bounds: bounds, safeArea: bounds.inset(by: safeAreaInsets))
-    }
-
-    public override func safeAreaInsetsDidChange() {
-        super.safeAreaInsetsDidChange()
-        setNeedsLayout()
+        runtime.setArea(bounds)
     }
 
     public override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {

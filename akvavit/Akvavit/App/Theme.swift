@@ -24,6 +24,8 @@ enum Theme {
     static let destructiveFill = Color(light: 0xB3261E, dark: 0xD93A30)
     static var accent: Color { homeColors.tint }
     /// Fact tiles in Get games' popup.
+    /// A layout's card on the Controls tab.
+    static let layoutCard = Color(light: 0xFFFFFF, dark: 0x252950, alpha: 0.7, darkAlpha: 0.7)
     static let installTile = Color(light: 0x138A78, dark: 0x3CC7B0, alpha: 0.08, darkAlpha: 0.16)
 
     // Get games' search field and source chips
@@ -60,10 +62,11 @@ enum Theme {
         tint: Color(light: 0x138A78, dark: 0x2A9D8A),
         paleFill: Color(light: 0x138A78, dark: 0x3CC7B0, alpha: 0.14, darkAlpha: 0.16),
         icon: Color(light: 0x0F6F61, dark: 0x6FE0CC))
+    /// Lilac (the canvas's colour scheme A).
     static let controlsColors = TabColors(
-        tint: Color(light: 0xC8641C, dark: 0xD9792F),
-        paleFill: Color(light: 0xC8641C, dark: 0xF0954D, alpha: 0.14, darkAlpha: 0.16),
-        icon: Color(light: 0xA14F12, dark: 0xFFB47A))
+        tint: Color(light: 0x7A4FD6, dark: 0x8F63F0),
+        paleFill: Color(light: 0x7A4FD6, dark: 0xA88AE8, alpha: 0.14, darkAlpha: 0.16),
+        icon: Color(light: 0x5F3BB5, dark: 0xC9B3FF))
     static let settingsColors = TabColors(
         tint: Color(light: 0xC03D79, dark: 0xD24E8C),
         paleFill: Color(light: 0xC03D79, dark: 0xEC6AA6, alpha: 0.14, darkAlpha: 0.16),

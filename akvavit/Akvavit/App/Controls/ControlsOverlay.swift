@@ -101,7 +101,7 @@ private struct OverlayControls: View {
 
     var body: some View {
         if let layout = runtime.layout {
-            ControlsCanvas(layout: layout, safeArea: runtime.safeArea, inPlay: true) { runtime.state(of: $0) }
+            ControlsCanvas(layout: layout, area: runtime.area, inPlay: true) { runtime.state(of: $0) }
         }
     }
 }

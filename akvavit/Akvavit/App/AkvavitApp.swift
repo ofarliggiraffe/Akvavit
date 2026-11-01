@@ -5,6 +5,8 @@ import SwiftUI
 
 @main
 struct AkvavitApp: App {
+    @UIApplicationDelegateAdaptor private var appDelegate: AppDelegate
+
     init() {
         AkvavitEngine.start()
     }

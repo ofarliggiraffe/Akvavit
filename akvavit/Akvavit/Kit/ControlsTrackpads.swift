@@ -152,7 +152,7 @@ extension ControlsRuntime {
 
     private func moveCursor(_ dx: CGFloat, _ dy: CGFloat) {
         let area = Self.pointerArea()
-        let gain = area.height / max(bounds.height, 1) * Self.mouseGain
+        let gain = area.height / max(self.area.height, 1) * Self.mouseGain
         var point = cursor ?? CGPoint(x: area.midX, y: area.midY)
         point.x = min(max(point.x + dx * gain, area.minX), area.maxX - 1)
         point.y = min(max(point.y + dy * gain, area.minY), area.maxY - 1)

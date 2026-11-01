@@ -15,7 +15,7 @@ Written for Akvavit. Where a file stands in for something of Madeira's, it says 
 | File | What it is |
 |---|---|
 | `project.yml` | The project. Its project-level build settings are the values Madeira's project sets, so Madeira's files compile the same way. |
-| `App/AkvavitApp.swift` | The app's entry point. |
+| `App/AkvavitApp.swift` | The app's entry point (with the app delegate for the orientation lock). |
 | `App/RootView.swift`, `App/TabColumn.swift`, `App/Theme.swift`, `App/LibraryView.swift`, `App/GetGamesView.swift`, `App/GameGrid.swift`, `App/CoverView.swift`, `App/GamePopup.swift`, `App/GameInfoFace.swift`, `App/GameSettingsFace.swift`, `App/Play.swift`, `App/SetupView.swift` | The interface, as the user designed it (the mockup canvas): tab column, theme, Library and Get games, the game popup with its flip and settings side, what Play does before a game starts (JIT, Valve's client files), and setup (welcome, JIT, Steam sign-in, done). |
 | `App/Test/*` | **Temporary test screens**, only for checking AkvavitKit on the device. The real interface replaces all of them. |
 | `Kit/Steam.swift` | Sign-in (on SwiftSteam's sign-in model), the account's games, downloads, uninstall, Valve's client files. **For now it uses Madeira's `MadeiraDock.games` (installed games), `SteamRuntimeInstaller` (Valve's client files), and for uninstall `SteamInstallFiles.delete` and Dock's install ledger.** |
@@ -32,6 +32,8 @@ Written for Akvavit. Where a file stands in for something of Madeira's, it says 
 | `Kit/ControlsRuntime.swift`, `Kit/ControlsTrackpads.swift`, `Kit/ControlsSticks.swift` | Controls in play: which control each finger is on, press timing, Hold and Sticky, trackpads (mouse, aim, move), sticks, the on-screen controller (the engine's controller snapshot, player 1), what goes to the game (the engine's key and mouse calls). |
 | `Kit/TextBridge.swift` | Typing into the game with the iPhone's keyboard (the engine's text call, with US keys). |
 | `App/Controls/ControlFace.swift`, `App/Controls/ControlsOverlay.swift` | How controls look (one renderer for the game, the studio and the Controls tab), and the controls over a running game with the test menu above them. |
+| `App/ControlsView.swift`, `App/Controls/ControlStudio.swift` | The Controls tab (built-in layouts and your copies, as cards with pictures of their controls, the haptics switch) and the controls studio (a layout at real size, Make a copy, the name, the layout's settings), as the user designed them. |
+| `App/OrientationLock.swift` | Landscape only while the studio or a game's screen is up (the app delegate's orientation answer). |
 | `Kit/GameSurface.swift` | The picture's place (the window-level Metal layer, layout) and touch as mouse (off when a control layout says so; a click lets sticky keys go). Follows two findings of Madeira's: the layer must not be in a SwiftUI-hosted view, and presents need the layer's display sync off. |
 | `App/AppIcon.icon` (the app icon as an Icon Composer file, which iOS 26 and later uses: background, light and dark layers), `App/Assets.xcassets` (the same icon whole, as the fallback), `scripts/make-app-icon.swift` (draws the images) | The icon the user chose on the design canvas (option C, a controller filled with a wireframe grid). |
 | `App/Info.plist`, `App/Akvavit.entitlements` | The app's keys and capabilities. |

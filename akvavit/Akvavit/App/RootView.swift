@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // The app's one screen: the tab column on the left, the selected tab's content
-// beside it, the game popup above them, and setup above everything on first
-// start (or when run again from Settings).
+// beside it, the game popup above them, the controls studio over all of that
+// while it is open, and setup above everything on first start (or when run
+// again from Settings).
 
 import AkvavitKit
 import SwiftUI
@@ -10,6 +11,8 @@ import SwiftUI
 struct RootView: View {
     @SceneStorage("tab") private var tab = AppTab.home
     @State private var popup = GamePopupModel()
+    /// The layout open in the controls studio, which covers everything.
+    @State private var studio: String?
 
     private var signedIn: Bool {
         if case .signedIn = Steam.shared.signIn { true } else { false }
@@ -18,6 +21,11 @@ struct RootView: View {
     var body: some View {
         ZStack {
             main
+            if let studio {
+                ControlStudio(layoutID: studio, close: closeStudio)
+                    .transition(.move(edge: .bottom))
+                    .zIndex(1)
+            }
             // Outside `main`, which ignores the keyboard: setup's card makes room for it.
             if !SetupFlow.shared.isDone {
                 SetupView()
@@ -56,6 +64,18 @@ struct RootView: View {
         .fullScreenCover(isPresented: .constant(Session.shared.state != .idle)) { GameScreen() }
     }
 
+    /// Landscape first, then the studio.
+    private func openStudio(_ id: String) {
+        guard studio == nil else { return }
+        OrientationLock.lock()
+        withAnimation(.easeOut(duration: 0.3)) { studio = id }
+    }
+
+    private func closeStudio() {
+        withAnimation(.easeOut(duration: 0.25)) { studio = nil }
+        OrientationLock.unlock()
+    }
+
     @ViewBuilder
     private func content(compact: Bool) -> some View {
         switch tab {
@@ -64,25 +84,10 @@ struct RootView: View {
         case .getGames:
             GetGamesView(compact: compact)
         case .controls:
-            ComingLater(title: "Controls", note: "Coming later.", compact: compact)
+            ControlsView(compact: compact, openStudio: openStudio)
         case .settings:
             // Temporary: the test screens, until Settings is designed.
             TestHome()
-        }
-    }
-}
-
-private struct ComingLater: View {
-    let title: String
-    let note: String
-    let compact: Bool
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            TabTitle(title, compact: compact)
-            Text(note)
-                .font(.quicksand(17, .semibold, relativeTo: .body))
-                .foregroundStyle(Theme.secondaryText)
         }
     }
 }

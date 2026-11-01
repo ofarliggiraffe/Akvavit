@@ -197,7 +197,10 @@ Both can be installed side by side. See "Akvavit's own app" below.
   for them).
 - **Logs:** `Documents/madeira-log.txt` copies empty while a game runs, but
   the hard links in `Documents/logs/` copy fine. Our lines are tagged
-  `[session]` (with `fps` every 10 s), `[touch]` and `[akvavit-steam]`.
+  `[session]` (with `fps` every 10 s), `[touch]`, `[controls]` and
+  `[akvavit-steam]`. Plain `stderr` reaches the file only once a session has
+  started (2026-11-01: interface lines written before any game never showed
+  up); before that only `LogStore` lines are there.
   The engine's `[xp]` lines (every 250 ms) carry the time, CPU split across
   fast and slow cores, and disk reads, which is enough to compare loading phases.
 - **Verified 2026-11-01** on the Duo:
