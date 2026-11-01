@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // The popup's info side: the cover, the title, the facts, Play, and below it
-// Game settings and Uninstall (which asks on the card itself).
+// Game settings and Uninstall (which asks on the card itself). For a game that
+// isn't installed (Get games): Install, then the download's progress; once
+// installed it turns into the full side.
 
 import AkvavitKit
 import SwiftUI
@@ -19,8 +21,8 @@ struct GameInfoFace: View {
             case .wide: wide
             case .tall: tall
             }
-            if model.confirmingUninstall {
-                UninstallConfirmation(game: game, width: min(380, size.width - 40), model: model)
+            if let confirming = model.confirming {
+                CardConfirmation(game: game, confirmation: confirming, width: min(380, size.width - 40), model: model)
             }
         }
         .foregroundStyle(Theme.cardText)
@@ -47,7 +49,7 @@ struct GameInfoFace: View {
                 FactsRow(game: game, compact: small)
                     .padding(.top, small ? 18 : 26)
                 Spacer(minLength: 16)
-                actions(compact: small)
+                buttons(compact: small)
             }
         }
         .padding(padding)
@@ -69,7 +71,7 @@ struct GameInfoFace: View {
             FactsRow(game: game, compact: true)
                 .padding(.top, 22)
             Spacer(minLength: 16)
-            actions(compact: true)
+            buttons(compact: true)
         }
         .padding(20)
     }
@@ -89,6 +91,15 @@ struct GameInfoFace: View {
             .lineLimit(3)
             .minimumScaleFactor(0.7)
             .accessibilityAddTraits(.isHeader)
+    }
+
+    @ViewBuilder
+    private func buttons(compact: Bool) -> some View {
+        if game.installed {
+            actions(compact: compact)
+        } else {
+            InstallButton(game: game, compact: compact, model: model)
+        }
     }
 
     private func actions(compact: Bool) -> some View {
@@ -128,7 +139,7 @@ struct GameInfoFace: View {
                 }
                 .buttonStyle(OutlineButtonStyle(fontSize: compact ? 15 : 16))
                 Button {
-                    model.askUninstall()
+                    model.ask(.uninstall)
                 } label: {
                     Label("Uninstall", systemImage: "trash")
                 }
@@ -146,7 +157,11 @@ private struct FactsRow: View {
         HStack(spacing: compact ? 10 : 16) {
             fact("Playtime", GameFacts.playtime(game.playtimeMinutes))
             fact("Released", game.releaseYear.map(String.init) ?? "—")
-            fact("Size on disk", GameFacts.size(game.sizeOnDisk))
+            if game.installed {
+                fact("Size on disk", GameFacts.size(game.sizeOnDisk))
+            } else {
+                fact("Size", GameFacts.size(game.installSize ?? game.downloadSize))
+            }
         }
     }
 
@@ -164,8 +179,142 @@ private struct FactsRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, compact ? 12 : 16)
         .padding(.vertical, compact ? 12 : 14)
-        .background(Theme.tile, in: .rect(cornerRadius: compact ? 14 : 16))
+        .background(game.installed ? Theme.tile : Theme.installTile, in: .rect(cornerRadius: compact ? 14 : 16))
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// Install, then the download's progress in its place, with its speed below
+/// and a button that cancels it; a failed download says why and offers to
+/// try again.
+private struct InstallButton: View {
+    let game: Game
+    let compact: Bool
+    let model: GamePopupModel
+
+    var body: some View {
+        let height: CGFloat = compact ? 56 : 58
+        let fontSize: CGFloat = compact ? 19 : 20
+        let teal = Theme.getGamesColors.tint
+        if let download = Steam.shared.downloads[game.appID] {
+            if case .failed(let reason) = download.phase {
+                VStack(spacing: compact ? 10 : 12) {
+                    Text(reason)
+                        .font(.quicksand(compact ? 13 : 14, .semibold, relativeTo: .footnote))
+                        .foregroundStyle(Theme.destructive)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: 10) {
+                        Button {
+                            Steam.shared.install(game.appID)
+                        } label: {
+                            Label("Try again", systemImage: "arrow.clockwise")
+                        }
+                        .buttonStyle(FilledButtonStyle(color: teal, height: height, fontSize: fontSize))
+                        cancelButton(height: height)
+                    }
+                }
+            } else {
+                VStack(spacing: 6) {
+                    HStack(spacing: 10) {
+                        ProgressBar(fraction: !download.sharedFiles && (download.phase == .downloading || download.phase == .finishing) ? download.fraction : 0,
+                                    label: Self.label(download), height: height, fontSize: compact ? 17 : 18)
+                        cancelButton(height: height)
+                    }
+                    Text(Self.detail(download))
+                        .font(.quicksand(13, .semibold, relativeTo: .footnote))
+                        .foregroundStyle(Theme.cardSecondaryText)
+                        .monospacedDigit()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.leading, 4)
+                }
+            }
+        } else if game.partiallyDownloaded {
+            HStack(spacing: 10) {
+                Button {
+                    Steam.shared.install(game.appID)
+                } label: {
+                    Label("Resume download", systemImage: "arrow.down.to.line")
+                }
+                .buttonStyle(FilledButtonStyle(color: teal, height: height, fontSize: fontSize))
+                cancelButton(height: height)
+            }
+        } else {
+            Button {
+                Steam.shared.install(game.appID)
+            } label: {
+                Label("Install", systemImage: "arrow.down.to.line")
+            }
+            .buttonStyle(FilledButtonStyle(color: teal, height: height, fontSize: fontSize))
+        }
+    }
+
+    private func cancelButton(height: CGFloat) -> some View {
+        Button {
+            model.ask(.cancelDownload)
+        } label: {
+            Image(systemName: "xmark")
+                .font(.system(size: 18, weight: .bold))
+                .frame(width: height, height: height)
+        }
+        .buttonStyle(OutlineButtonStyle(height: height, destructive: true))
+        .frame(width: height)
+        .accessibilityLabel("Cancel download")
+    }
+
+    /// Speed and amount, under the bar: "12.3 MB/s · 1.2 of 22 GB".
+    static func detail(_ download: SteamDownload) -> String {
+        guard download.phase == .downloading, !download.sharedFiles, download.totalBytes > 0 else { return " " }
+        var parts: [String] = []
+        if download.bytesPerSecond > 0 {
+            parts.append(ByteCountFormatter.string(fromByteCount: Int64(download.bytesPerSecond), countStyle: .file) + "/s")
+        }
+        parts.append(GameFacts.size(Int64(download.doneBytes)) + " of " + GameFacts.size(Int64(download.totalBytes)))
+        return parts.joined(separator: " · ")
+    }
+
+    static func label(_ download: SteamDownload) -> String {
+        if download.sharedFiles, download.phase != .waiting { return "Checking Steam's shared files…" }
+        return switch download.phase {
+        case .waiting: "Waiting for another download"
+        case .preparing: "Preparing…"
+        case .checking: "Checking files…"
+        case .downloading: "Downloading… \(Int(download.fraction * 100))%"
+        case .finishing: "Finishing…"
+        case .failed: "Failed"
+        }
+    }
+}
+
+private struct ProgressBar: View {
+    let fraction: Double
+    let label: String
+    let height: CGFloat
+    let fontSize: CGFloat
+
+    var body: some View {
+        let teal = Theme.getGamesColors.tint
+        RoundedRectangle(cornerRadius: 18)
+            .fill(teal.opacity(0.16))
+            .overlay(alignment: .leading) {
+                GeometryReader { proxy in
+                    teal.frame(width: proxy.size.width * min(max(fraction, 0), 1))
+                        .animation(.linear(duration: 0.15), value: fraction)
+                }
+            }
+            .overlay {
+                Text(label)
+                    .font(.quicksand(fontSize, .bold, relativeTo: .headline))
+                    .foregroundStyle(fraction > 0.5 ? Color.white : Theme.cardText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .padding(.horizontal, 12)
+            }
+            .clipShape(.rect(cornerRadius: 18))
+            .frame(height: height)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(label)
+            .accessibilityValue(Text("\(Int(fraction * 100)) percent"))
     }
 }
 
@@ -196,44 +345,66 @@ struct CloseButton: View {
     }
 }
 
-/// Asks before uninstalling, on the card itself.
-private struct UninstallConfirmation: View {
+/// Asks on the card itself before something that can't be undone: an
+/// uninstall, or cancelling a download (what it downloaded is deleted).
+private struct CardConfirmation: View {
     let game: Game
+    let confirmation: GamePopupModel.Confirmation
     let width: CGFloat
     let model: GamePopupModel
 
+    private var title: String {
+        switch confirmation {
+        case .uninstall: "Uninstall \(game.name)?"
+        case .cancelDownload: "Cancel the download?"
+        }
+    }
+
+    private var message: String {
+        switch confirmation {
+        case .uninstall:
+            (game.sizeOnDisk.map { "This deletes its \(GameFacts.size($0)) of game files." } ?? "This deletes its game files.")
+                + " You can install it again from Get games."
+        case .cancelDownload:
+            "What has been downloaded of \(game.name) so far is deleted."
+        }
+    }
+
+    private var keepLabel: String { confirmation == .uninstall ? "Cancel" : "Keep downloading" }
+    private var actionLabel: String { confirmation == .uninstall ? "Uninstall" : "Cancel download" }
+
     var body: some View {
+        let working = model.confirmedWorking
         ZStack {
             Theme.cardDim
                 .contentShape(.rect)
-                .onTapGesture { model.cancelUninstall() }
+                .onTapGesture { model.dismissConfirmation() }
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 10) {
-                Text("Uninstall \(game.name)?")
+                Text(title)
                     .font(.quicksand(20, .bold, relativeTo: .title3))
-                Text((game.sizeOnDisk.map { "This deletes its \(GameFacts.size($0)) of game files." } ?? "This deletes its game files.")
-                     + " You can install it again from Get games.")
-                if let error = model.uninstallError {
+                Text(message)
+                if let error = model.confirmError {
                     Text(error)
                         .font(.quicksand(14, .semibold, relativeTo: .footnote))
                         .foregroundStyle(Theme.destructive)
                 }
                 HStack(spacing: 10) {
-                    Button("Cancel") { model.cancelUninstall() }
+                    Button(keepLabel) { model.dismissConfirmation() }
                         .buttonStyle(OutlineButtonStyle(fontSize: 16, height: 46))
                     Button {
-                        Task { await model.uninstall() }
+                        Task { await model.confirm() }
                     } label: {
-                        if model.uninstalling {
+                        if working {
                             ProgressView().tint(.white)
                         } else {
-                            Text("Uninstall")
+                            Text(actionLabel)
                         }
                     }
                     .buttonStyle(FilledButtonStyle(color: Theme.destructiveFill, height: 46, fontSize: 16))
-                    .accessibilityLabel(model.uninstalling ? "Uninstalling" : "Uninstall")
+                    .accessibilityLabel(working ? "Working" : actionLabel)
                 }
-                .disabled(model.uninstalling)
+                .disabled(working)
                 .padding(.top, 8)
             }
             .font(.quicksand(15, .semibold, relativeTo: .body))
@@ -299,8 +470,11 @@ enum GameFacts {
         }
     }
 
+    /// GB with one decimal, MB whole: "22.2 GB", "2.4 GB", "669 MB".
     static func size(_ bytes: Int64?) -> String {
         guard let bytes else { return "—" }
-        return ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+        let gigabytes = Double(bytes) / 1e9
+        if gigabytes >= 1 { return gigabytes.formatted(.number.precision(.fractionLength(1))) + " GB" }
+        return "\(max(1, Int((Double(bytes) / 1e6).rounded()))) MB"
     }
 }

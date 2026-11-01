@@ -33,6 +33,7 @@ struct RootView: View {
             }
             .onChange(of: proxy.size) { popup.layoutChanged() }
         }
+        .ignoresSafeArea(.keyboard)
         .background { ThemeBackground().ignoresSafeArea() }
         .environment(popup)
         // Steam's view of the games: at start, and after signing in.
@@ -47,7 +48,7 @@ struct RootView: View {
         case .home:
             LibraryView(compact: compact) { tab = .getGames }
         case .getGames:
-            ComingLater(title: "Get games", note: "Comes in a later step.", compact: compact)
+            GetGamesView(compact: compact)
         case .controls:
             ComingLater(title: "Controls", note: "Coming later.", compact: compact)
         case .settings:

@@ -231,6 +231,9 @@ targets:
   AkvavitKit:
     type: framework.static
     platform: iOS
+    # Linked only into the app, so the app's minimum (BackgroundTasks' continued
+    # processing, for downloads, needs it).
+    deploymentTarget: "26.0"
     sources:
       - path: Kit
         excludes: [Engine]

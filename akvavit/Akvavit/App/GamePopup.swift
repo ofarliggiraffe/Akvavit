@@ -35,15 +35,17 @@ final class GamePopupModel {
     /// Fade in place instead of flying (Reduce Motion, or the cover is gone).
     private(set) var crossfade = false
     private(set) var settingsShown = false
-    private(set) var confirmingUninstall = false
+    /// A question on the card, before something that can't be undone.
+    enum Confirmation { case uninstall, cancelDownload }
+    private(set) var confirming: Confirmation?
     /// Changes to rebuild the card at its current values, dropping animations.
     private(set) var cardID = 0
 
     /// Play's steps and problems.
     let play = PlayStart()
-    /// The confirmed uninstall is running; the card waits for it.
-    private(set) var uninstalling = false
-    private(set) var uninstallError: String?
+    /// The confirmed action is running; the card waits for it.
+    private(set) var confirmedWorking = false
+    private(set) var confirmError: String?
 
     private var generation = 0
     private var began = false
@@ -73,9 +75,11 @@ final class GamePopupModel {
         backdrop = 0
         crossfade = reduceMotion
         settingsShown = false
-        confirmingUninstall = false
-        uninstallError = nil
+        confirming = nil
+        confirmError = nil
         play.clearProblem()
+        // A search field's keyboard would squeeze the card.
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
         began = false
         phase = .opening
         // The card appears at the cover first; begin() moves it once it is on screen.
@@ -109,11 +113,11 @@ final class GamePopupModel {
     }
 
     func close() {
-        guard phase == .open, !tipping, !uninstalling else { return }
+        guard phase == .open, !tipping, !confirmedWorking else { return }
         generation += 1
         let gen = generation
         phase = .closing
-        confirmingUninstall = false
+        confirming = nil
         settingsShown = false
         tip = 0
         withAnimation(.easeOut(duration: 0.32)) { backdrop = 0 }
@@ -147,7 +151,7 @@ final class GamePopupModel {
     private func setSettings(_ shown: Bool) {
         guard phase == .open, !tipping, settingsShown != shown else { return }
         settingsShown = shown
-        confirmingUninstall = false
+        confirming = nil
         tipping = true
         let gen = generation
         withAnimation(crossfade ? Self.fade : Self.flip(duration: 0.9)) {
@@ -157,37 +161,42 @@ final class GamePopupModel {
         }
     }
 
-    func askUninstall() {
-        uninstallError = nil
-        confirmingUninstall = true
+    func ask(_ confirmation: Confirmation) {
+        confirmError = nil
+        confirming = confirmation
     }
 
-    func cancelUninstall() {
-        guard !uninstalling else { return }
-        confirmingUninstall = false
+    func dismissConfirmation() {
+        guard !confirmedWorking else { return }
+        confirming = nil
     }
 
-    /// Uninstalls the open game; the popup closes when it is done, or the
-    /// confirmation says what went wrong.
-    func uninstall() async {
-        guard let game, phase == .open, !uninstalling else { return }
-        uninstalling = true
-        uninstallError = nil
+    /// Does what the card asked about. Uninstall closes the popup when done;
+    /// a cancelled download leaves Install in its place. A failure shows in
+    /// the question.
+    func confirm() async {
+        guard let game, phase == .open, let confirming, !confirmedWorking else { return }
+        confirmedWorking = true
+        confirmError = nil
         do {
-            try await Steam.shared.uninstall(game.appID)
-            uninstalling = false
-            close()
+            switch confirming {
+            case .uninstall: try await Steam.shared.uninstall(game.appID)
+            case .cancelDownload: try await Steam.shared.cancelInstall(game.appID)
+            }
+            confirmedWorking = false
+            self.confirming = nil
+            if confirming == .uninstall { close() }
         } catch {
-            uninstalling = false
-            uninstallError = error.localizedDescription
+            confirmedWorking = false
+            confirmError = error.localizedDescription
         }
     }
 
     /// A tap outside the card, or VoiceOver's escape: one level at a time.
     func back() {
-        guard phase == .open, !tipping, !uninstalling else { return }
-        if confirmingUninstall {
-            confirmingUninstall = false
+        guard phase == .open, !tipping, !confirmedWorking else { return }
+        if confirming != nil {
+            confirming = nil
         } else if settingsShown {
             hideSettings()
         } else {

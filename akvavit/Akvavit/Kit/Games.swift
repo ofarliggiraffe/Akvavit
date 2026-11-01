@@ -24,11 +24,20 @@ public struct Game: Identifiable, Hashable, Sendable, Codable {
     public internal(set) var sizeOnDisk: Int64?
     /// About how much a download is (Windows depots).
     public internal(set) var downloadSize: Int64?
+    /// About how much room it takes once installed (Windows depots).
+    public internal(set) var installSize: Int64?
     public internal(set) var releaseYear: Int?
     /// The account's playtime in minutes.
     public internal(set) var playtimeMinutes: Int?
     /// Owned and has Windows content to install.
     public internal(set) var installable: Bool
+    /// Its folder under the library's `common`.
+    var installDir: String?
+    /// Files of a download that stopped (Install resumes it), stored as
+    /// optional so lists cached before it existed still load.
+    var partial: Bool?
+    /// Not installed, but a stopped download left files (Install resumes it).
+    public var partiallyDownloaded: Bool { !installed && partial == true }
     /// Artwork file names from the product info (relative to the app's folder
     /// on Steam's CDN).
     var capsuleImage: String?
@@ -92,9 +101,22 @@ public final class Games {
         for record in installed {
             var game = byID["steam:\(record.id)"] ?? Game(steamAppID: record.id, name: record.name)
             game.installed = true
+            game.partial = nil
             game.sizeOnDisk = SteamInstallFiles.sizeOnDisk(
                 appID: record.id, steamApps: drive.appendingPathComponent(record.library, isDirectory: true))
             byID[game.id] = game
+        }
+        // Folders of downloads that stopped. A folder an installed game uses isn't one.
+        let common = drive.appendingPathComponent(SteamInstallPaths.libraryRelative, isDirectory: true)
+            .appendingPathComponent("common", isDirectory: true)
+        let installedFolders = Set(installed.map { $0.installDir.lowercased() })
+        for id in byID.keys where !byID[id]!.installed {
+            guard let folder = byID[id]!.installDir, !folder.isEmpty,
+                  !installedFolders.contains(folder.lowercased()) else {
+                byID[id]!.partial = nil
+                continue
+            }
+            byID[id]!.partial = FileManager.default.fileExists(atPath: common.appendingPathComponent(folder).path)
         }
         save()
     }
@@ -146,12 +168,15 @@ public final class Games {
             var game = byID["steam:\(app.appID)"] ?? Game(steamAppID: Int(app.appID), name: app.name)
             if !app.name.isEmpty { game.name = app.name }
             game.installable = app.installableOnWindows
-            let size = app.downloadSize(for: "windows")
-            game.downloadSize = size > 0 && size < UInt64(Int64.max) ? Int64(size) : nil
+            func bytes(_ size: UInt64) -> Int64? { size > 0 && size < UInt64(Int64.max) ? Int64(size) : nil }
+            game.downloadSize = bytes(app.downloadSize(for: "windows"))
+            game.installSize = bytes(app.installSize(for: "windows"))
             game.capsuleImage = app.libraryCapsule
             game.headerImage = app.headerImage
+            game.installDir = app.installDir.isEmpty ? nil : app.installDir
             byID[game.id] = game
         }
+        reloadInstalled()
     }
 
     /// Signed out: only installed games stay, which still play through Dock.

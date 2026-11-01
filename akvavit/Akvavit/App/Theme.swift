@@ -23,6 +23,16 @@ enum Theme {
     static let destructiveOutline = Color(light: 0xB3261E, dark: 0xFF8A80, alpha: 0.28, darkAlpha: 0.4)
     static let destructiveFill = Color(light: 0xB3261E, dark: 0xD93A30)
     static var accent: Color { homeColors.tint }
+    /// Fact tiles in Get games' popup.
+    static let installTile = Color(light: 0x138A78, dark: 0x3CC7B0, alpha: 0.08, darkAlpha: 0.16)
+
+    // Get games' search field and source chips
+    static let field = Color(light: 0xFFFFFF, dark: 0xFFFFFF, alpha: 0.6, darkAlpha: 0.1)
+    static let chipBackground = Color(light: 0xFFFFFF, dark: 0xFFFFFF, alpha: 0.55, darkAlpha: 0.08)
+    static let chipBorder = Color(light: 0x20243A, dark: 0xFFFFFF, alpha: 0.12, darkAlpha: 0.16)
+
+    // Download marks on covers
+    static let failed = Color(hex: 0xD93A30)
 
     // Shadows and dimming
     static let shadow = Color(light: 0x26285A, dark: 0x000000)

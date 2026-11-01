@@ -97,6 +97,13 @@ struct CoverCell: View {
         } label: {
             CoverArt(game: game, titleSize: compact ? 12 : 15)
                 .aspectRatio(2 / 3, contentMode: .fit)
+                .overlay(alignment: .top) {
+                    if let download = Steam.shared.downloads[game.appID] {
+                        DownloadMark(download: download)
+                    } else if game.partiallyDownloaded {
+                        CoverLabel(text: "Paused")
+                    }
+                }
                 .clipShape(.rect(cornerRadius: compact ? 10 : 12))
                 .shadow(color: Theme.shadow.opacity(0.18), radius: 3, y: 2)
                 .shadow(color: Theme.shadow.opacity(0.28), radius: 13, y: 12)
@@ -111,6 +118,59 @@ struct CoverCell: View {
         .onAppear { if popup.isShowing(game) { popup.sourceVisible = true } }
         .onDisappear { if popup.isShowing(game) { popup.sourceVisible = false } }
         .accessibilityLabel(game.name)
+    }
+}
+
+/// A download's state on its cover: a progress bar, "Waiting", or a red mark
+/// when it failed (its popup says why).
+private struct DownloadMark: View {
+    let download: SteamDownload
+
+    var body: some View {
+        switch download.phase {
+        case .failed:
+            Image(systemName: "exclamationmark")
+                .font(.system(size: 14, weight: .heavy))
+                .foregroundStyle(.white)
+                .frame(width: 26, height: 26)
+                .background(Theme.failed, in: .circle)
+                .shadow(color: .black.opacity(0.3), radius: 3, y: 1)
+                .padding(8)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .accessibilityLabel("Download failed")
+        case .waiting:
+            CoverLabel(text: "Waiting")
+        default:
+            Capsule()
+                .fill(.white.opacity(0.35))
+                .overlay(alignment: .leading) {
+                    GeometryReader { proxy in
+                        Capsule().fill(.white)
+                            .frame(width: proxy.size.width * (download.sharedFiles ? 0 : min(max(download.fraction, 0), 1)))
+                    }
+                }
+                .clipShape(.capsule)
+                .frame(height: 6)
+                .shadow(color: .black.opacity(0.25), radius: 2)
+                .padding(10)
+                .accessibilityLabel("Downloading, \(Int(download.fraction * 100)) percent")
+        }
+    }
+}
+
+/// A short word on a cover's top left ("Waiting", "Paused").
+private struct CoverLabel: View {
+    let text: String
+
+    var body: some View {
+        Text(text)
+            .font(.quicksand(11, .bold, relativeTo: .caption))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(Color(hex: 0x0C0E1E, alpha: 0.72), in: .capsule)
+            .padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

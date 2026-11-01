@@ -27,6 +27,9 @@ public struct SteamDownload: Equatable, Sendable {
     public var doneBytes: UInt64
     public var totalBytes: UInt64
     public var bytesPerSecond: Double
+    /// Steam's shared redistributables (Visual C++, DirectX), which come
+    /// before the game; usually only checked.
+    public var sharedFiles = false
 }
 
 @MainActor @Observable
@@ -41,6 +44,10 @@ public final class Steam {
     @ObservationIgnored private lazy var fetcher = SteamLibraryFetcher(session: session)
     @ObservationIgnored private lazy var downloader = DepotDownloader(session: session)
     @ObservationIgnored private var downloadTasks: [Int: Task<Void, Never>] = [:]
+    /// Downloads in order: the first one runs, the others wait.
+    @ObservationIgnored private var queue: [Int] = []
+    /// Each started download's folder under `common`, for cleaning up after a cancel.
+    @ObservationIgnored private var installDirs: [Int: String] = [:]
 
     private init() {
         watcher = SteamSignInModel.shared.objectWillChange.sink { [weak self] _ in
@@ -179,12 +186,18 @@ public final class Steam {
 
     /// Downloads a game (or brings it up to date), with the shared
     /// redistributables it takes from Steam. One at a time; others wait.
+    /// Called from a tap: the download may go on in the background, with
+    /// iOS showing its progress (DownloadActivity).
     public func install(_ appID: Int) {
         guard downloadTasks[appID] == nil else { return }
         downloads[appID] = SteamDownload(phase: .waiting, fraction: 0, doneBytes: 0, totalBytes: 0, bytesPerSecond: 0)
-        let previous = downloadTasks.values.first
+        queue.append(appID)
+        DownloadActivity.shared.begin(title: "Downloading " + gameName(appID))
         downloadTasks[appID] = Task { [weak self] in
-            await previous?.value
+            // Waiting ends with its turn, or at once when cancelled.
+            while let self, self.queue.first != appID, !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(250))
+            }
             await self?.runInstall(appID)
         }
     }
@@ -194,8 +207,73 @@ public final class Steam {
         downloadTasks[appID]?.cancel()
     }
 
+    /// A download runs or waits.
+    var hasQueuedDownloads: Bool { !queue.isEmpty }
+
+    /// Stops every download (iOS ended the background work). Files stay.
+    func stopAllDownloads() {
+        for task in downloadTasks.values { task.cancel() }
+    }
+
+    /// Stops a download of a game that isn't installed and deletes what it
+    /// downloaded so far. A failed download's files go the same way.
+    public func cancelInstall(_ appID: Int) async throws {
+        if let task = downloadTasks[appID] {
+            task.cancel()
+            await task.value
+        }
+        downloads[appID] = nil
+        guard !installedIDs().contains(appID),
+              let folder = installDirs[appID] ?? Games.shared.game("steam:\(appID)")?.installDir,
+              !folder.isEmpty else { return }
+        let steamApps = MadeiraDock.drive.appendingPathComponent(SteamInstallPaths.libraryRelative, isDirectory: true)
+        try await Task.detached(priority: .userInitiated) {
+            try SteamInstallFiles.delete(appID: appID, folderName: folder, steamApps: steamApps)
+        }.value
+        installDirs[appID] = nil
+        refreshInstalled()
+        SteamLog.event("[akvavit-steam] cancelled and deleted app=\(appID)")
+    }
+
+    private func gameName(_ appID: Int) -> String {
+        Games.shared.game("steam:\(appID)")?.name ?? games.first { $0.id == appID }?.name ?? "a game"
+    }
+
+    /// Tells iOS's progress display about the first download in line.
+    private func reportActivity(lastSucceeded: Bool = true) {
+        guard let appID = queue.first(where: { downloads[$0] != nil }), let download = downloads[appID] else {
+            DownloadActivity.shared.end(success: lastSucceeded)
+            return
+        }
+        // Words that change only with the step: each change is an update of
+        // the Live Activity. The progress carries the percentage.
+        let waiting = queue.count - 1
+        var subtitle: String
+        if download.sharedFiles {
+            subtitle = "Steam's shared files"
+        } else {
+            switch download.phase {
+            case .downloading: subtitle = "Downloading"
+            case .finishing: subtitle = "Finishing"
+            case .checking: subtitle = "Checking files"
+            default: subtitle = "Preparing"
+            }
+        }
+        if waiting > 0 { subtitle += " · \(waiting) more waiting" }
+        let gameProgress = !download.sharedFiles && (download.phase == .downloading || download.phase == .finishing)
+        DownloadActivity.shared.update(job: appID, title: "Downloading " + gameName(appID), subtitle: subtitle,
+                                       fraction: gameProgress ? download.fraction : 0)
+    }
+
     private func runInstall(_ appID: Int) async {
-        defer { downloadTasks[appID] = nil }
+        var succeeded = false
+        defer {
+            downloadTasks[appID] = nil
+            queue.removeAll { $0 == appID }
+            reportActivity(lastSucceeded: succeeded)
+            // A stopped download leaves files: the list marks the game.
+            if !succeeded { Games.shared.reloadInstalled() }
+        }
         guard !Task.isCancelled else { downloads[appID] = nil; return }
         let library = SteamInstallPaths.libraryRelative
         do {
@@ -203,23 +281,31 @@ public final class Steam {
             guard let info = try await fetcher.fetchInstallInfo(appID: UInt32(appID)) else {
                 throw SteamError.appInfoNotFound(UInt32(appID))
             }
+            installDirs[appID] = info.installDir
             let steamApps = MadeiraDock.drive.appendingPathComponent(library, isDirectory: true)
             try FileManager.default.createDirectory(at: steamApps.appendingPathComponent("common"),
                                                     withIntermediateDirectories: true)
             SteamLog.event("[akvavit-steam] install app=\(appID)")
-            let report: (SteamDownloadProgress) -> Void = { [weak self] progress in
-                Task { @MainActor in
-                    // A report can arrive after the download ended; it must not bring it back.
-                    guard let self, self.downloadTasks[appID] != nil, self.downloads[appID] != nil else { return }
-                    self.downloads[appID] = Self.download(progress)
+            func report(sharedFiles: Bool) -> (SteamDownloadProgress) -> Void {
+                { [weak self] progress in
+                    Task { @MainActor in
+                        // A report can arrive after the download ended; it must not bring it back.
+                        guard let self, self.downloadTasks[appID] != nil, self.downloads[appID] != nil else { return }
+                        var download = Self.download(progress)
+                        download.sharedFiles = sharedFiles
+                        self.downloads[appID] = download
+                        self.reportActivity()
+                    }
                 }
             }
             try await AkvavitSteamRedist.install(for: info, library: library, fetcher: fetcher,
-                                                 downloader: downloader, progress: report)
+                                                 downloader: downloader, progress: report(sharedFiles: true))
             _ = try await downloader.install(info, steamApps: steamApps,
                                              ownedDepots: { [weak self] in try? await self?.fetcher.ownedDepotIDs() },
-                                             progress: report)
+                                             progress: report(sharedFiles: false))
             downloads[appID] = nil
+            installDirs[appID] = nil
+            succeeded = true
             refreshInstalled()
             SteamLog.event("[akvavit-steam] installed app=\(appID)")
         } catch {
