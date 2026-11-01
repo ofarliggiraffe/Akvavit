@@ -5,8 +5,12 @@
 # Your Apple developer team ID (Xcode > Settings > Apple Accounts).
 TEAM_ID=XXXXXXXXXX
 
-# The app's bundle identifier. Use a prefix you own.
+# The bundle identifier of Madeira's app as Akvavit builds it. Use a prefix you own.
 BUNDLE_ID=com.example.akvavit
+
+# The bundle identifier of Akvavit's own app (akvavit/Akvavit), installed next to
+# Madeira's. Optional: BUNDLE_ID with ".app" appended when empty.
+APP_BUNDLE_ID=
 
 # Your device's UDID, used by scripts that install to the device.
 DEVICE_UDID=

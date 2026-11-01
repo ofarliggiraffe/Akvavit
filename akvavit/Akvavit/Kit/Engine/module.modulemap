@@ -1,0 +1,9 @@
+// Madeira's C and Objective-C engine interface (Wine, FEX, JIT, the iOS
+// display driver), as one Clang module. AkvavitKit's Swift files see it
+// without an import statement (OTHER_SWIFT_FLAGS: -import-module), so
+// Madeira's own Swift files compile in AkvavitKit unchanged, as they do with
+// Madeira's bridging header in Madeira's app.
+module MadeiraEngine {
+    header "MadeiraEngine.h"
+    export *
+}

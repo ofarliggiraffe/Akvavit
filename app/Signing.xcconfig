@@ -4,7 +4,10 @@
 // akvavit/scripts/setup.sh writes from local.config:
 //   DEVELOPMENT_TEAM = <your team ID>
 //   MADEIRA_BUNDLE_IDENTIFIER = <your bundle ID>
+//   AKVAVIT_APP_BUNDLE_IDENTIFIER = <the bundle ID of Akvavit's own app>
+// Akvavit's own app (akvavit/Akvavit) uses this file as its base configuration too.
 DEVELOPMENT_TEAM =
 MADEIRA_BUNDLE_IDENTIFIER = com.example.akvavit
+AKVAVIT_APP_BUNDLE_IDENTIFIER = com.example.akvavit.app
 
 #include? "Signing.local.xcconfig"

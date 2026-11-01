@@ -6,11 +6,13 @@
 #   2. adds Madeira as the remote "upstream", which the privacy check needs to tell
 #      our commits from Madeira's, and fetches it;
 #   3. checks out the submodules at their pinned commits;
-#   4. writes the team ID and bundle ID from local.config into
+#   4. writes the team ID and bundle IDs from local.config into
 #      app/Signing.local.xcconfig (git-ignored), which app/Signing.xcconfig includes;
-#   5. checks everything of ours for personal information.
+#   5. generates the Xcode project of Akvavit's own app (akvavit/Akvavit/project.yml);
+#   6. checks everything of ours for personal information.
 #
-# Then run akvavit/scripts/build-native.sh, and build the "Madeira" scheme in Xcode.
+# Then run akvavit/scripts/build-native.sh, and build the "Akvavit" scheme
+# (akvavit/Akvavit/Akvavit.xcodeproj) or the "Madeira" scheme (app/Madeira.xcodeproj) in Xcode.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -25,6 +27,8 @@ die() { printf '\nERROR: %s\n' "$*" >&2; exit 1; }
 source "$ROOT/local.config"
 [[ "${TEAM_ID:-}" =~ ^[A-Z0-9]{10}$ ]] || die "local.config: TEAM_ID must be a 10-character Apple team ID."
 [[ "${BUNDLE_ID:-}" =~ ^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$ ]] || die "local.config: BUNDLE_ID is not a bundle identifier."
+APP_BUNDLE_ID="${APP_BUNDLE_ID:-$BUNDLE_ID.app}"
+[[ "$APP_BUNDLE_ID" =~ ^[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$ ]] || die "local.config: APP_BUNDLE_ID is not a bundle identifier."
 
 log "Installing git hooks"
 git -C "$ROOT" config core.hooksPath "$HOOKS"
@@ -55,7 +59,15 @@ git -C "$ROOT" submodule update --init --recursive
 log "Writing app/Signing.local.xcconfig from local.config"
 printf '%s\n' '// Written by akvavit/scripts/setup.sh from local.config. Git-ignored.' \
     "DEVELOPMENT_TEAM = $TEAM_ID" \
-    "MADEIRA_BUNDLE_IDENTIFIER = $BUNDLE_ID" >"$ROOT/app/Signing.local.xcconfig"
+    "MADEIRA_BUNDLE_IDENTIFIER = $BUNDLE_ID" \
+    "AKVAVIT_APP_BUNDLE_IDENTIFIER = $APP_BUNDLE_ID" >"$ROOT/app/Signing.local.xcconfig"
+
+log "Generating akvavit/Akvavit/Akvavit.xcodeproj (Akvavit's own app) with XcodeGen"
+if ! command -v xcodegen >/dev/null; then
+    command -v brew >/dev/null || die "XcodeGen is needed for Akvavit's own app: install Homebrew, or XcodeGen from github.com/yonaskolb/XcodeGen."
+    brew install xcodegen
+fi
+xcodegen generate --spec "$ROOT/akvavit/Akvavit/project.yml" --quiet
 
 # Only needed for committing, so a build-only setup doesn't need PERSONAL_WORDS.
 if [[ -n "${PERSONAL_WORDS:-}" ]]; then

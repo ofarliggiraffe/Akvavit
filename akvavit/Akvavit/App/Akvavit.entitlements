@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- 32-bit games: the guest memory window needs both (an explicit App ID). -->
+	<key>com.apple.developer.kernel.extended-virtual-addressing</key>
+	<true/>
+	<key>com.apple.developer.kernel.increased-memory-limit</key>
+	<true/>
+	<!-- Akvavit's JIT VPN (AkvavitTunnel). -->
+	<key>com.apple.developer.networking.networkextension</key>
+	<array>
+		<string>packet-tunnel-provider</string>
+	</array>
+	<key>com.apple.security.cs.allow-jit</key>
+	<true/>
+	<!-- A debugger may attach: that is how JIT is enabled. -->
+	<key>get-task-allow</key>
+	<true/>
+</dict>
+</plist>

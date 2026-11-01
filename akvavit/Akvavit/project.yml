@@ -1,0 +1,388 @@
+# Akvavit's own app. XcodeGen generates Akvavit.xcodeproj (git-ignored) from
+# this file: akvavit/scripts/setup.sh runs it, or `xcodegen` in this folder.
+#
+#   Akvavit          the app: our interface (App/), SwiftUI only
+#   AkvavitKit       our engine layer (Kit/), a static framework linked into
+#                    the app, plus Madeira's engine files compiled in place
+#   AkvavitTunnel    our JIT VPN (akvavit/Tunnel, shared with Madeira's project)
+#   AkvavitJITHelper Madeira's JIT helper extension, unchanged
+#
+# Which files are ours and which are Madeira's: PROVENANCE.md.
+#
+# Build settings: no XcodeGen presets. The project-level settings are the ones
+# Madeira's project sets, so Madeira's files compile as they do there; anything
+# not set takes Xcode's default, as in Madeira's project.
+
+name: Akvavit
+options:
+  settingPresets: none
+  createIntermediateGroups: false
+  developmentLanguage: en
+  deploymentTarget:
+    iOS: "17.0"
+
+configFiles:
+  Debug: ../../app/Signing.xcconfig
+  Release: ../../app/Signing.xcconfig
+
+settings:
+  base:
+    ALWAYS_SEARCH_USER_PATHS: NO
+    CLANG_ANALYZER_NONNULL: YES
+    CLANG_CXX_LANGUAGE_STANDARD: gnu++20
+    CLANG_ENABLE_MODULES: YES
+    CLANG_ENABLE_OBJC_ARC: YES
+    COPY_PHASE_STRIP: NO
+    ENABLE_STRICT_OBJC_MSGSEND: YES
+    GCC_WARN_64_TO_32_BIT_CONVERSION: YES
+    GCC_WARN_ABOUT_RETURN_TYPE: YES_ERROR
+    GCC_WARN_UNDECLARED_SELECTOR: YES
+    GCC_WARN_UNINITIALIZED_AUTOS: YES_AGGRESSIVE
+    GCC_WARN_UNUSED_FUNCTION: YES
+    GCC_WARN_UNUSED_VARIABLE: YES
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    MTL_FAST_MATH: YES
+    SDKROOT: iphoneos
+    # The engine is device-only; this also keeps Xcode from picking a simulator.
+    SUPPORTED_PLATFORMS: iphoneos
+    SUPPORTS_MACCATALYST: NO
+    TARGETED_DEVICE_FAMILY: "1,2"
+    SWIFT_VERSION: "5.0"
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGN_IDENTITY: Apple Development
+    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "0.1.0"
+    PRODUCT_NAME: $(TARGET_NAME)
+  configs:
+    Debug:
+      DEBUG_INFORMATION_FORMAT: dwarf
+      ENABLE_TESTABILITY: YES
+      GCC_DYNAMIC_NO_PIC: NO
+      GCC_OPTIMIZATION_LEVEL: "0"
+      GCC_PREPROCESSOR_DEFINITIONS: ["DEBUG=1", "$(inherited)"]
+      MTL_ENABLE_DEBUG_INFO: INCLUDE_SOURCE
+      ONLY_ACTIVE_ARCH: YES
+      SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) DEBUG"
+      SWIFT_OPTIMIZATION_LEVEL: -Onone
+    Release:
+      DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
+      ENABLE_NS_ASSERTIONS: NO
+      MTL_ENABLE_DEBUG_INFO: NO
+      SWIFT_COMPILATION_MODE: wholemodule
+      VALIDATE_PRODUCT: YES
+
+schemes:
+  Akvavit:
+    build:
+      targets:
+        Akvavit: all
+    run:
+      config: Debug
+    archive:
+      config: Debug
+
+targets:
+  Akvavit:
+    type: application
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: App
+        excludes: [Info.plist, Akvavit.entitlements]
+      # Madeira's bundled engine files, read by its C and Swift code from the app
+      # bundle's top level.
+      - path: ../../app/Madeira/aarch64-windows
+        type: folder
+        group: Madeira resources
+      - path: ../../app/Madeira/arm64ec-windows
+        type: folder
+        group: Madeira resources
+      - path: ../../app/Madeira/i386-windows
+        type: folder
+        group: Madeira resources
+      - path: ../../app/Madeira/nls
+        type: folder
+        group: Madeira resources
+      - path: ../../app/Madeira/compat
+        type: folder
+        group: Madeira resources
+      - path: ../../app/Madeira/gl
+        type: folder
+        group: Madeira resources
+      - path: ../../app/Madeira/vulkan
+        type: folder
+        group: Madeira resources
+      - path: ../../app/Madeira/d3d12
+        type: folder
+        group: Madeira resources
+      - path: ../../app/Madeira/x86_64-opengl
+        type: folder
+        group: Madeira resources
+      - path: ../../app/Madeira/x86_64-vcruntime
+        type: folder
+        group: Madeira resources
+      - path: ../../app/Madeira/i386-vcruntime
+        type: folder
+        group: Madeira resources
+      - path: ../../app/Madeira/legal
+        type: folder
+        group: Madeira resources
+      - path: ../../app/Madeira/licenses
+        type: folder
+        group: Madeira resources
+      - path: ../../app/Madeira/prefix-template.tar.gz
+        group: Madeira resources
+        buildPhase: resources
+      - path: ../../app/Madeira/cacert.pem
+        group: Madeira resources
+        buildPhase: resources
+      - path: ../../app/Madeira/madeira-jit.js
+        group: Madeira resources
+        buildPhase: resources
+    dependencies:
+      - target: AkvavitKit
+        embed: false
+      - target: AkvavitTunnel
+      - target: AkvavitJITHelper
+    settings:
+      base:
+        PRODUCT_NAME: Akvavit
+        PRODUCT_BUNDLE_IDENTIFIER: $(AKVAVIT_APP_BUNDLE_IDENTIFIER)
+        INFOPLIST_FILE: App/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: App/Akvavit.entitlements
+        LD_RUNPATH_SEARCH_PATHS: ["$(inherited)", "@executable_path/Frameworks"]
+        # AkvavitKit's module refers to Madeira's engine headers.
+        SWIFT_INCLUDE_PATHS: $(SRCROOT)/Kit/Engine
+        LIBRARY_SEARCH_PATHS:
+          - $(inherited)
+          - $(SRCROOT)/../../FEX/build-ios/FEXCore/Source
+          - $(SRCROOT)/../../FEX/build-ios/External/fmt
+          - $(SRCROOT)/../../FEX/build-ios/External/cephes
+          - $(SRCROOT)/../../FEX/build-ios/External/xxhash/cmake_unofficial
+          - $(SRCROOT)/../../FEX/build-ios/External/SoftFloat-3e
+          - $(SRCROOT)/../../app/Madeira
+        OTHER_LDFLAGS:
+          - $(inherited)
+          # All of AkvavitKit: DXMT and Wine find some of its symbols only at run
+          # time (dlsym), so nothing may be left out.
+          - -force_load
+          - $(BUILT_PRODUCTS_DIR)/AkvavitKit.framework/AkvavitKit
+          # Madeira's native engine (built by akvavit/scripts/build-native.sh)
+          - -lntdll_unix
+          - -lwin32u_unix
+          - -lwineserver
+          - -ldxmt_combined
+          - -lmadeira_rppairing
+          - -lFEXCore
+          - -lFEXCore_Base
+          - -lJemallocLibs
+          - -lfmt
+          - -lcephes_128bit
+          - -lsoftfloat_3e
+          - -lxxhash
+          - -lavcodec
+          - -lavformat
+          - -lavutil
+          - -lswresample
+          - -lgnutls
+          - -lhogweed
+          - -lnettle
+          - -lgmp
+          - -lc++
+          - -lz
+          - -lsqlite3
+          - -llzma
+          - -framework
+          - AudioToolbox
+          - -framework
+          - CoreFoundation
+          - -framework
+          - CoreMedia
+          - -framework
+          - CoreVideo
+          - -framework
+          - IOKit
+          - -framework
+          - IOSurface
+          - -framework
+          - Metal
+          - -framework
+          - MetalFX
+          - -framework
+          - OpenGLES
+          - -framework
+          - QuartzCore
+          - -framework
+          - VideoToolbox
+          - -weak_framework
+          - ExtensionFoundation
+    postBuildScripts:
+      - name: Bundle Wine Mono
+        script: bash "$SRCROOT/../../build/wine-mono/bundle.sh" "$CODESIGNING_FOLDER_PATH/wine-mono"
+        basedOnDependencyAnalysis: false
+      - name: Embed StikJIT
+        script: bash "$SRCROOT/scripts/embed-stikjit.sh"
+        basedOnDependencyAnalysis: false
+      - name: Check licences, sign bundled dylibs
+        script: bash "$SRCROOT/scripts/sign-bundled-dylibs.sh"
+        basedOnDependencyAnalysis: false
+
+  AkvavitKit:
+    type: framework.static
+    platform: iOS
+    sources:
+      - path: Kit
+        excludes: [Engine]
+      - path: Kit/Engine
+        buildPhase: none
+      # Our earlier Akvavit additions, shared with Madeira's app.
+      - path: ../App/AkvavitTunnel.swift
+        group: Akvavit (shared with Madeira's app)
+      - path: ../App/AkvavitSteamPoll.swift
+        group: Akvavit (shared with Madeira's app)
+      - path: ../App/AkvavitSteamRedist.swift
+        group: Akvavit (shared with Madeira's app)
+      - path: ../App/AkvavitInstallScripts.swift
+        group: Akvavit (shared with Madeira's app)
+      - path: ../App/AkvavitSessionLogs.swift
+        group: Akvavit (shared with Madeira's app)
+      - path: ../App/AkvavitVCRuntime.swift
+        group: Akvavit (shared with Madeira's app)
+      # Madeira's native glue (C, Objective-C): a component, compiled unchanged.
+      - path: ../../app/Madeira/JITAllocator.c
+        group: Madeira engine (native)
+      - path: ../../app/Madeira/FEXBridge.mm
+        group: Madeira engine (native)
+      - path: ../../app/Madeira/WineServerBridge.m
+        group: Madeira engine (native)
+      - path: ../../app/Madeira/WineProcessBridge.m
+        group: Madeira engine (native)
+      - path: ../../app/Madeira/wine_stubs.c
+        group: Madeira engine (native)
+      - path: ../../app/Madeira/PrefixExtractor.c
+        group: Madeira engine (native)
+      - path: ../../app/Madeira/IOSDisplayShim.m
+        group: Madeira engine (native)
+      - path: ../../app/Madeira/PadOutput.m
+        group: Madeira engine (native)
+      - path: ../../app/Madeira/Winios/Winios.m
+        group: Madeira engine (native)
+      - path: ../../app/Madeira/Winios/WiniosGL.m
+        group: Madeira engine (native)
+      - path: ../../app/Madeira/Winios/WiniosCursor.c
+        group: Madeira engine (native)
+      - path: ../../app/Madeira/Winios/WiniosGamepad.c
+        group: Madeira engine (native)
+      # SwiftSteam: a component (library), compiled unchanged.
+      - path: ../../app/Madeira/SwiftSteam
+        group: Madeira SwiftSteam
+        excludes: [SteamSignInView.swift, "*.h"]
+      # Madeira's engine-side Swift, compiled unchanged FOR NOW. Each one is to
+      # be replaced by our own code behind AkvavitKit's API (PROVENANCE.md).
+      - path: ../../app/Madeira/SteamKeyValues.swift
+        group: Madeira Swift (to replace)
+      - path: ../../app/Madeira/SteamInstall.swift
+        group: Madeira Swift (to replace)
+      - path: ../../app/Madeira/SteamRuntime.swift
+        group: Madeira Swift (to replace)
+      - path: ../../app/Madeira/ExternalStorage.swift
+        group: Madeira Swift (to replace)
+      - path: ../../app/Madeira/LogStore.swift
+        group: Madeira Swift (to replace)
+      - path: ../../app/Madeira/LogTail.swift
+        group: Madeira Swift (to replace)
+      - path: ../../app/Madeira/LogSummary.swift
+        group: Madeira Swift (to replace)
+      - path: ../../app/Madeira/LogPattern.swift
+        group: Madeira Swift (to replace)
+      - path: ../../app/Madeira/JITPoolMeter.swift
+        group: Madeira Swift (to replace)
+      - path: ../../app/Madeira/MadeiraConfig.swift
+        group: Madeira Swift (to replace)
+      - path: ../../app/Madeira/MadeiraDock.swift
+        group: Madeira Swift (to replace)
+      - path: ../../app/Madeira/DockInstallers.swift
+        group: Madeira Swift (to replace)
+      - path: ../../app/Madeira/DockReset.swift
+        group: Madeira Swift (to replace)
+      - path: ../../app/Madeira/StikJITHelper.swift
+        group: Madeira Swift (to replace)
+      - path: ../../app/Madeira/JITSetup.swift
+        group: Madeira Swift (to replace)
+      - path: ../../app/Madeira/JITBuiltInHost.swift
+        group: Madeira Swift (to replace)
+      # Also in the JIT helper: one group for both, as Xcode requires.
+      - path: ../../app/Madeira/JITBuiltInMessages.swift
+        group: Madeira JIT helper
+      - path: ../../app/Madeira/JITNetwork.swift
+        group: Madeira Swift (to replace)
+      - path: ../../app/Madeira/JITPairing.swift
+        group: Madeira Swift (to replace)
+      - path: ../../app/Madeira/EntitlementChecker.swift
+        group: Madeira Swift (to replace)
+      - path: ../../app/Madeira/WineMono.swift
+        group: Madeira Swift (to replace)
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(AKVAVIT_APP_BUNDLE_IDENTIFIER).Kit
+        GENERATE_INFOPLIST_FILE: YES
+        DEFINES_MODULE: NO
+        SKIP_INSTALL: YES
+        SWIFT_INSTALL_OBJC_HEADER: NO
+        APPLICATION_EXTENSION_API_ONLY: NO
+        # Madeira's engine interface as a module that every Swift file of
+        # AkvavitKit sees without an import (Kit/Engine/module.modulemap).
+        SWIFT_INCLUDE_PATHS: $(SRCROOT)/Kit/Engine
+        OTHER_SWIFT_FLAGS: "$(inherited) -Xfrontend -import-module -Xfrontend MadeiraEngine"
+        # FEXBridge.mm
+        HEADER_SEARCH_PATHS:
+          - $(inherited)
+          - $(SRCROOT)/../../FEX/FEXCore/include
+          - $(SRCROOT)/../../FEX/FEXHeaderUtils
+          - $(SRCROOT)/../../FEX/CodeEmitter
+          - $(SRCROOT)/../../FEX/External/fmt/include
+          - $(SRCROOT)/../../FEX/External/range-v3/include
+          - $(SRCROOT)/../../FEX/External/unordered_dense/include
+          - $(SRCROOT)/../../FEX/build-ios
+          - $(SRCROOT)/../../FEX/build-ios/include
+          - $(SRCROOT)/../../FEX/build-ios/FEXCore/Source
+          - $(SRCROOT)/../../FEX
+
+  AkvavitTunnel:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ../Tunnel/PacketTunnelProvider.swift
+        group: Tunnel
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(AKVAVIT_APP_BUNDLE_IDENTIFIER).Tunnel
+        INFOPLIST_FILE: ../Tunnel/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: ../Tunnel/AkvavitTunnel.entitlements
+        APPLICATION_EXTENSION_API_ONLY: YES
+        LD_RUNPATH_SEARCH_PATHS: ["$(inherited)", "@executable_path/Frameworks", "@executable_path/../../Frameworks"]
+        SKIP_INSTALL: YES
+
+  AkvavitJITHelper:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: ../../app/MadeiraJITHelper/MadeiraJITHelper.swift
+        group: Madeira JIT helper
+      - path: ../../app/Madeira/JITBuiltInMessages.swift
+        group: Madeira JIT helper
+    settings:
+      base:
+        # Madeira's host code looks the helper up as PlugIns/MadeiraJITHelper.appex.
+        PRODUCT_NAME: MadeiraJITHelper
+        PRODUCT_BUNDLE_IDENTIFIER: $(AKVAVIT_APP_BUNDLE_IDENTIFIER).JITHelper
+        INFOPLIST_FILE: ../../app/MadeiraJITHelper/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        APPLICATION_EXTENSION_API_ONLY: YES
+        FRAMEWORK_SEARCH_PATHS: $(SRCROOT)/../../app/Frameworks/StikJIT.xcframework/ios-arm64
+        LD_RUNPATH_SEARCH_PATHS: ["$(inherited)", "@executable_path/../../Frameworks"]
+        OTHER_LDFLAGS: ["$(inherited)", "-framework", "StikJIT", "-framework", "ExtensionFoundation"]
+        SKIP_INSTALL: NO

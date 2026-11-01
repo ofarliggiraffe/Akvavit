@@ -33,7 +33,8 @@ import UserNotifications
     static let shared = OnDevicePairing()
 
     /// Shown on the iPhone as "Pair with Madeira"; the host identifier is derived from it.
-    static let hostName = "Madeira"
+    // Akvavit: the app's own name ("Madeira" or "Akvavit"), so two apps on one device can be told apart.
+    static let hostName = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Madeira"
     static let timeout: TimeInterval = 300
 
     enum Phase: Equatable {
