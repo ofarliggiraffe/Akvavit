@@ -83,6 +83,11 @@ public final class Games {
         reloadInstalled()
     }
 
+    /// Steam apps that are installed but aren't games: Steamworks Common
+    /// Redistributables (Visual C++, DirectX), which downloads install for
+    /// the games that use them (AkvavitSteamRedist).
+    private static let notGames: Set<Int> = [228980]
+
     private func sorted(_ games: some Sequence<Game>) -> [Game] {
         games.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
@@ -92,7 +97,8 @@ public final class Games {
     /// Reads the install records again: what is installed, and its size.
     public func reloadInstalled() {
         let drive = MadeiraDock.drive
-        let installed = MadeiraDock.games(drive: drive).filter(\.installed)
+        let installed = MadeiraDock.games(drive: drive).filter { $0.installed && !Self.notGames.contains($0.id) }
+        for id in Self.notGames { byID["steam:\(id)"] = nil }
         let installedIDs = Set(installed.map { "steam:\($0.id)" })
         for id in byID.keys where byID[id]!.installed && !installedIDs.contains(id) {
             byID[id]!.installed = false
