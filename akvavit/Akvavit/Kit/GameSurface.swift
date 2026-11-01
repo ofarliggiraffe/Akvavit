@@ -224,6 +224,7 @@ public final class GameSurfaceView: UIView {
     }
 
     public override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        TextBridge.shared.hide()   // a tap on the game puts the keyboard away
         let active = activeTouches(event)
         switch gesture {
         case .none where active.count == 1:

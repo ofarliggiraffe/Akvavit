@@ -39,6 +39,31 @@ public enum VirtualKey {
         0xDB: "[", 0xDC: "\\", 0xDD: "]", 0xDE: "'",
     ]
 
+    /// The key that types `character` on a US keyboard, and whether it takes
+    /// Shift; nil for characters it has no key for.
+    public static func usKey(for character: Unicode.Scalar) -> (vk: Int, shift: Bool)? {
+        let value = Int(character.value)
+        switch value {
+        case 0x61...0x7A: return (value - 0x20, false)   // a-z
+        case 0x41...0x5A, 0x30...0x39, 0x20: return (value, value >= 0x41)   // A-Z, 0-9, space
+        default: return usPunctuation[Character(character)]
+        }
+    }
+
+    private static let usPunctuation: [Character: (vk: Int, shift: Bool)] = {
+        var keys: [Character: (vk: Int, shift: Bool)] = [:]
+        for (vk, plain, shifted) in [(0xBD, "-", "_"), (0xBB, "=", "+"), (0xDB, "[", "{"), (0xDD, "]", "}"),
+                                     (0xDC, "\\", "|"), (0xBA, ";", ":"), (0xDE, "'", "\""), (0xBC, ",", "<"),
+                                     (0xBE, ".", ">"), (0xBF, "/", "?"), (0xC0, "`", "~")] as [(Int, Character, Character)] {
+            keys[plain] = (vk, false)
+            keys[shifted] = (vk, true)
+        }
+        for (digit, shifted) in zip(Array("1234567890"), Array("!@#$%^&*()")) {
+            keys[shifted] = (Int(digit.asciiValue!), true)
+        }
+        return keys
+    }()
+
     /// The key's name as a keyboard shows it ("Ctrl", "F5", "E", "1").
     public static func name(_ vk: Int) -> String {
         if let name = names[vk] { return name }

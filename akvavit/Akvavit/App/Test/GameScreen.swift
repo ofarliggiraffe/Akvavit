@@ -39,11 +39,25 @@ struct TestGameMenu: View {
                     }
                     .buttonStyle(.bordered)
                 }
+                // Not saved: the studio's layout menu sets it for good.
+                Toggle("Touch on the game as mouse", isOn: Binding(
+                    get: { runtime.touchAsMouse },
+                    set: { on in
+                        guard var layout = runtime.layout else { return }
+                        layout.gameTouch = on ? .mouse : .off
+                        runtime.use(layout)
+                    }))
+                .frame(width: 252)
             }
             VStack(spacing: 12) {
                 Text("Test menu").font(.headline)
                 Button("Back to game", action: close)
                     .buttonStyle(.bordered)
+                Button("Show keyboard") {
+                    close()
+                    TextBridge.shared.show()
+                }
+                .buttonStyle(.bordered)
                 Button("Quit (closes Akvavit)", role: .destructive) { Session.shared.quit() }
                     .buttonStyle(.borderedProminent)
             }

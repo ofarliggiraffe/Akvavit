@@ -26,6 +26,7 @@ final class ControlsOverlay {
 
     func hide() {
         ControlsRuntime.shared.releaseAll()
+        TextBridge.shared.hide()
         GameOverlay.hide()
         controller = nil
     }

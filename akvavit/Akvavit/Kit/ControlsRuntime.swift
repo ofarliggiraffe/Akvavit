@@ -22,6 +22,9 @@ public final class ControlState {
     public internal(set) var latched = false
     /// For a key row: the key a finger is on.
     public internal(set) var pressedKey: Int?
+    /// For a stick: where the knob is, as a part of its reach (-1 to 1 each
+    /// way, y down).
+    public internal(set) var knob = CGPoint.zero
 }
 
 @MainActor @Observable
@@ -48,6 +51,11 @@ public final class ControlsRuntime {
     @ObservationIgnored var cursorMoved = false
     @ObservationIgnored var aim = CGVector.zero
     @ObservationIgnored var motionLink: CADisplayLink?
+    /// Sticks with a thumb on them, and the controller they drive
+    /// (ControlsSticks.swift).
+    @ObservationIgnored var sticks: [UUID: StickThumb] = [:]
+    @ObservationIgnored var pad = winios_gamepad()
+    @ObservationIgnored var padConnected = false
 
     /// Games see a press at least this long, however quick the tap.
     private static let shortestPress: CFTimeInterval = 0.05
@@ -69,6 +77,7 @@ public final class ControlsRuntime {
         states = [:]
         self.layout = layout
         fputs("[controls] layout \(layout?.name ?? "none")\n", stderr)
+        if let layout, Self.usesPad(layout) { connectPad() }
     }
 
     public func state(of id: UUID) -> ControlState {
@@ -81,6 +90,7 @@ public final class ControlsRuntime {
     /// Lets go of everything the controls hold down.
     public func releaseAll() {
         stopTrackpads()
+        stopSticks()
         for action in downCounts.keys { send(action, down: false) }
         downCounts = [:]
         stickies = [:]
@@ -89,6 +99,7 @@ public final class ControlsRuntime {
             state.pressed = false
             state.latched = false
             state.pressedKey = nil
+            state.knob = .zero
         }
     }
 
@@ -111,9 +122,15 @@ public final class ControlsRuntime {
     // MARK: Touches
 
     struct Touch {
+        enum Role {
+            /// A button or key: what the touch holds, and how.
+            case press(ControlAction, PressBehaviour)
+            case trackpad
+            case stick
+        }
+
         let control: UUID
-        /// For buttons and keys: what the touch holds, and how. Nil on a trackpad.
-        let press: (action: ControlAction, behaviour: PressBehaviour)?
+        let role: Role
         let generation: Int
         let began: CFTimeInterval
     }
@@ -125,7 +142,7 @@ public final class ControlsRuntime {
         let hits = layout.controls.reversed().filter { $0.placement.frame(in: safeArea).contains(point) }
         for control in hits {
             switch control.kind {
-            case .button(let button) where Self.works(button.action):
+            case .button, .stick:
                 return (control, nil)
             case .keyRow(let row):
                 if let key = row.keyIndex(at: point.x, in: control.placement.frame(in: safeArea)) { return (control, key) }
@@ -136,14 +153,6 @@ public final class ControlsRuntime {
         return hits.first { if case .trackpad = $0.kind { true } else { false } }.map { ($0, nil) }
     }
 
-    /// What this version sends to the game.
-    private static func works(_ action: ControlAction) -> Bool {
-        switch action {
-        case .key, .mouse, .wheel: true
-        case .pad, .keyboard: false
-        }
-    }
-
     /// A finger landed on `control` (`finger` names it until it lifts).
     func began(_ control: Control, key: Int?, finger: ObjectIdentifier, at point: CGPoint) -> Touch? {
         let state = state(of: control.id)
@@ -151,7 +160,11 @@ public final class ControlsRuntime {
         switch control.kind {
         case .trackpad(let pad):
             trackpadBegan(control.id, pad, finger: finger, at: point)
-            return Touch(control: control.id, press: nil, generation: generation, began: CACurrentMediaTime())
+            return Touch(control: control.id, role: .trackpad, generation: generation, began: CACurrentMediaTime())
+        case .stick(let stick):
+            guard stickBegan(control.id, stick, in: control.placement.frame(in: safeArea), finger: finger, at: point)
+            else { return nil }
+            return Touch(control: control.id, role: .stick, generation: generation, began: CACurrentMediaTime())
         case .button(let button):
             (action, behaviour) = (button.action, button.whenTapped)
         case .keyRow(let row):
@@ -184,20 +197,28 @@ public final class ControlsRuntime {
                 press(action)
             }
         }
-        return Touch(control: control.id, press: (action, behaviour),
+        return Touch(control: control.id, role: .press(action, behaviour),
                      generation: generation, began: CACurrentMediaTime())
     }
 
     func moved(_ touch: Touch, finger: ObjectIdentifier, to point: CGPoint) {
-        if touch.press == nil { trackpadMoved(touch.control, finger: finger, to: point) }
+        switch touch.role {
+        case .trackpad: trackpadMoved(touch.control, finger: finger, to: point)
+        case .stick: stickMoved(touch.control, finger: finger, to: point)
+        case .press: break
+        }
     }
 
     func ended(_ touch: Touch, finger: ObjectIdentifier) {
-        guard let press = touch.press else { return trackpadEnded(touch.control, finger: finger) }
-        let state = state(of: touch.control)
-        state.pressed = false
-        state.pressedKey = nil
-        guard press.behaviour == .press, touch.generation == generation else { return }
+        switch touch.role {
+        case .trackpad: return trackpadEnded(touch.control, finger: finger)
+        case .stick: return stickEnded(touch.control, finger: finger)
+        case .press(_, let behaviour):
+            let state = state(of: touch.control)
+            state.pressed = false
+            state.pressedKey = nil
+            guard behaviour == .press, touch.generation == generation else { return }
+        }
         let wait = Self.shortestPress - (CACurrentMediaTime() - touch.began)
         guard wait > 0 else { return finishPress(touch) }
         DispatchQueue.main.asyncAfter(deadline: .now() + wait) { [weak self] in
@@ -206,8 +227,8 @@ public final class ControlsRuntime {
     }
 
     private func finishPress(_ touch: Touch) {
-        guard touch.generation == generation, let press = touch.press else { return }
-        release(press.action)
+        guard touch.generation == generation, case .press(let action, _) = touch.role else { return }
+        release(action)
         releaseStickies()
     }
 
@@ -257,8 +278,10 @@ public final class ControlsRuntime {
         case .wheel(let wheel):
             guard down else { return }
             winios_pointer(0, 0, 0x0800, UInt32(bitPattern: wheel == .up ? 120 : -120))
-        case .pad, .keyboard:
-            break
+        case .pad(let button):
+            setPadButton(button, down: down)
+        case .keyboard:
+            if down { TextBridge.shared.toggle() }
         }
     }
 }

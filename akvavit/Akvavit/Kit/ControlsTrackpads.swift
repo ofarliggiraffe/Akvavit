@@ -45,10 +45,12 @@ extension ControlsRuntime {
     private static let moveDeadZone: CGFloat = 14
     private static let moveRelease: CGFloat = 10
     /// The keys for each direction, right first, anticlockwise.
-    private static let directionKeys: [[Int]] = {
-        let (w, a, s, d) = (0x57, 0x41, 0x53, 0x44)
-        return [[d], [w, d], [w], [w, a], [a], [s, a], [s], [s, d]]
-    }()
+    static let wasd = keys(up: 0x57, left: 0x41, down: 0x53, right: 0x44)
+    static let arrows = keys(up: VirtualKey.up, left: VirtualKey.left, down: VirtualKey.down, right: VirtualKey.right)
+
+    private static func keys(up: Int, left: Int, down: Int, right: Int) -> [[Int]] {
+        [[right], [up, right], [up], [up, left], [left], [down, left], [down], [down, right]]
+    }
 
     func trackpadBegan(_ id: UUID, _ pad: ControlTrackpad, finger: ObjectIdentifier, at point: CGPoint) {
         let fingers = trackpads[id] ?? TrackpadFingers(pad: pad)
@@ -87,7 +89,7 @@ extension ControlsRuntime {
             fingers.mover = fingers.points.keys.first
             if fingers.pad.mode == .move {
                 // Another finger takes over, from where it is.
-                setKeys(fingers, [])
+                setKeys(&fingers.keys, [])
                 fingers.direction = nil
                 if let mover = fingers.mover, let point = fingers.points[mover] { fingers.origin = point }
             }
@@ -122,17 +124,18 @@ extension ControlsRuntime {
         }
     }
 
-    fileprivate func motionTick() {
+    fileprivate func motionTick(_ seconds: CFTimeInterval) {
+        stickAim(seconds)
         flushMotion()
-        guard trackpads.isEmpty else { return }
+        guard trackpads.isEmpty, !hasAimingSticks else { return }
         motionLink?.invalidate()
         motionLink = nil
         aim = .zero
     }
 
-    private func startMotionLink() {
+    func startMotionLink() {
         guard motionLink == nil else { return }
-        let link = CADisplayLink(target: MotionTicker(), selector: #selector(MotionTicker.tick))
+        let link = CADisplayLink(target: MotionTicker(), selector: #selector(MotionTicker.tick(_:)))
         link.add(to: .main, forMode: .common)
         motionLink = link
     }
@@ -157,40 +160,41 @@ extension ControlsRuntime {
         cursorMoved = true
     }
 
-    /// Move: the direction from where the finger landed, in eighths, kept
-    /// until the finger is clearly in the next one.
+    /// Move: the direction from where the finger landed.
     private func steer(_ fingers: TrackpadFingers, to point: CGPoint) {
-        let dx = point.x - fingers.origin.x, dy = fingers.origin.y - point.y
-        var direction = fingers.direction
-        if hypot(dx, dy) < (direction == nil ? Self.moveDeadZone : Self.moveRelease) {
-            direction = nil
-        } else {
-            let eighth = CGFloat.pi / 4
-            let angle = atan2(dy, dx)
-            let nearest = (Int((angle / eighth).rounded()) + 8) % 8
-            if let held = direction {
-                var off = abs(angle - CGFloat(held) * eighth).truncatingRemainder(dividingBy: 2 * .pi)
-                if off > .pi { off = 2 * .pi - off }
-                if off > eighth / 2 + 0.12 { direction = nearest }
-            } else {
-                direction = nearest
-            }
-        }
+        let direction = Self.direction(point.x - fingers.origin.x, fingers.origin.y - point.y, held: fingers.direction,
+                                       enter: Self.moveDeadZone, leave: Self.moveRelease)
         guard direction != fingers.direction else { return }
         fingers.direction = direction
-        setKeys(fingers, direction.map { Self.directionKeys[$0] } ?? [])
+        setKeys(&fingers.keys, direction.map { Self.wasd[$0] } ?? [])
     }
 
-    private func setKeys(_ fingers: TrackpadFingers, _ keys: [Int]) {
-        for key in fingers.keys where !keys.contains(key) { release(.key(key)) }
-        for key in keys where !fingers.keys.contains(key) { press(.key(key)) }
-        fingers.keys = keys
+    /// The direction of (dx, dy), y up, in eighths of a turn from the right,
+    /// anticlockwise. None while shorter than `enter` (`leave` once one is
+    /// held). A held direction stays until the push is clearly in the next one.
+    static func direction(_ dx: CGFloat, _ dy: CGFloat, held: Int?, enter: CGFloat, leave: CGFloat) -> Int? {
+        guard hypot(dx, dy) >= (held == nil ? enter : leave) else { return nil }
+        let eighth = CGFloat.pi / 4
+        let angle = atan2(dy, dx)
+        let nearest = (Int((angle / eighth).rounded()) + 8) % 8
+        guard let held else { return nearest }
+        var off = abs(angle - CGFloat(held) * eighth).truncatingRemainder(dividingBy: 2 * .pi)
+        if off > .pi { off = 2 * .pi - off }
+        return off > eighth / 2 + 0.12 ? nearest : held
+    }
+
+    /// Holds `keys` instead of `held`: lets go of the ones no longer wanted.
+    func setKeys(_ held: inout [Int], _ keys: [Int]) {
+        for key in held where !keys.contains(key) { release(.key(key)) }
+        for key in keys where !held.contains(key) { press(.key(key)) }
+        held = keys
     }
 }
 
 /// CADisplayLink's target (it keeps it).
 private final class MotionTicker: NSObject {
-    @objc func tick() {
-        MainActor.assumeIsolated { ControlsRuntime.shared.motionTick() }
+    @objc func tick(_ link: CADisplayLink) {
+        let seconds = max(link.targetTimestamp - link.timestamp, 0)
+        MainActor.assumeIsolated { ControlsRuntime.shared.motionTick(seconds) }
     }
 }

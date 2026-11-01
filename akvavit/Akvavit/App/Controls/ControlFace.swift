@@ -49,7 +49,7 @@ struct ControlFace: View {
         case .button(let button): ButtonFace(button: button, state: state)
         case .keyRow(let row): KeyRowFace(row: row, state: state)
         case .trackpad(let pad): TrackpadFace(pad: pad, state: state)
-        case .stick(let stick): StickFace(stick: stick)
+        case .stick(let stick): StickFace(stick: stick, state: state)
         }
     }
 }
@@ -170,19 +170,23 @@ struct TrackpadFace: View {
 
 struct StickFace: View {
     let stick: ControlStick
+    let state: ControlState?
 
     var body: some View {
         GeometryReader { geometry in
             let side = min(geometry.size.width, geometry.size.height)
+            let knob = state?.knob ?? .zero
+            let reach = side * ControlsRuntime.stickReach
             ZStack {
                 Circle()
-                    .fill(ControlColors.lilac.opacity(0.15))
+                    .fill(ControlColors.lilac.opacity(state?.pressed == true ? 0.3 : 0.15))
                     .strokeBorder(Color.white.opacity(0.7), lineWidth: 3)
                 Circle()
                     .fill(Color.white.opacity(0.85))
                     .frame(width: side * 0.4, height: side * 0.4)
+                    .offset(x: knob.x * reach, y: knob.y * reach)
                 if stick.worksAs == .wasd {
-                    letters(side)
+                    letters(side, knob: knob)
                 }
             }
             .frame(width: side, height: side)
@@ -190,16 +194,18 @@ struct StickFace: View {
         }
     }
 
-    private func letters(_ side: CGFloat) -> some View {
+    /// W A S D, lit in the direction pushed.
+    private func letters(_ side: CGFloat, knob: CGPoint) -> some View {
         let font = ControlColors.font(min(14, side * 0.08))
         let inset = side * 0.06
+        let dead = CGFloat(stick.deadZone)
+        func lit(_ on: Bool) -> Color { on ? ControlColors.glow : .white }
         return ZStack {
-            Text("W").frame(maxHeight: .infinity, alignment: .top).padding(.top, inset)
-            Text("S").frame(maxHeight: .infinity, alignment: .bottom).padding(.bottom, inset)
-            Text("A").frame(maxWidth: .infinity, alignment: .leading).padding(.leading, inset)
-            Text("D").frame(maxWidth: .infinity, alignment: .trailing).padding(.trailing, inset)
+            Text("W").foregroundStyle(lit(knob.y < -dead)).frame(maxHeight: .infinity, alignment: .top).padding(.top, inset)
+            Text("S").foregroundStyle(lit(knob.y > dead)).frame(maxHeight: .infinity, alignment: .bottom).padding(.bottom, inset)
+            Text("A").foregroundStyle(lit(knob.x < -dead)).frame(maxWidth: .infinity, alignment: .leading).padding(.leading, inset)
+            Text("D").foregroundStyle(lit(knob.x > dead)).frame(maxWidth: .infinity, alignment: .trailing).padding(.trailing, inset)
         }
         .font(font)
-        .foregroundStyle(.white)
     }
 }

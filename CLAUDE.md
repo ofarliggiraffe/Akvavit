@@ -209,6 +209,17 @@ Both can be installed side by side. See "Akvavit's own app" below.
     the user measured it as about the same;
   - fold/unfold, and the test menu with Quit.
 - **Open:**
+  - **Priority: keep the app out of iCloud backups** (the user, 2026-11-01).
+    Backups grew huge: the Wine prefix, with every Steam game inside it,
+    is in `Documents` and was backed up. iOS has no switch to exclude a
+    whole app, so the app marks its own folders (`Documents` and
+    `Library/Application Support`, all of each) excluded from backup
+    (`isExcludedFromBackup`). The mark is lost when a folder is created
+    again, so set it at each start and again after anything that adds or
+    removes data: downloads, installs and uninstalls, Repair, a new
+    prefix, Wine Mono, logs. For anyone who installs the app, not only
+    this device. Not excludable: UserDefaults (`Library/Preferences`, tiny)
+    and the Keychain. Caches and tmp are never backed up anyway.
   - Quit should end the game and return to the app rather than close it
     (wait for Wine to stop, then show the app; a second game still needs a
     restart). Madeira can't quit a game either. It belongs with the real
@@ -440,6 +451,16 @@ through Dock at 60 FPS, RT2, Portal).
     connected before the game starts).
 
   Next step: temporary logging of every XInput call in the 32-bit xinput.
+  Our own on-screen controller (2026-11-01, Akvavit's app, parked by the
+  user) behaves the same: connected in slot 0 before Portal starts, with
+  `joystick 1` saved in Portal's config and the game restarted, Portal's
+  process loads `inputsystem.dll`, `SDL2.dll`, Steam's
+  `gameoverlayrenderer.dll` and Wine's `XInput1_4.dll`, yet never reads a
+  state: no `[xinput] ml2114 first state query` line, no `ml2180` state read.
+  (The `wine_xinput_hid_update` thread proves nothing: any query of an empty
+  slot 1-3 starts it.) Portal's joystick goes through SDL2, so look there
+  next (SDL's XInput detection, or Steam Input taking the device). Try a
+  second XInput game (Portal 2) before blaming the transport.
   A game's Controller choice "XInput and DirectInput" doesn't work through
   Dock: it's exported at Play, but Windows programs inherit their environment
   from Steam, which started earlier. DirectInput reads it from there.
