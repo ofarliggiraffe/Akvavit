@@ -37,6 +37,8 @@ struct RootView: View {
         .environment(popup)
         // Steam's view of the games: at start, and after signing in.
         .task(id: signedIn) { await Games.shared.refresh() }
+        // A session's screen, from Play or the test screens; one session per app run.
+        .fullScreenCover(isPresented: .constant(Session.shared.state != .idle)) { GameScreen() }
     }
 
     @ViewBuilder

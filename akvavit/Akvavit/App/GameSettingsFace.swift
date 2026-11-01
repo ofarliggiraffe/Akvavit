@@ -10,9 +10,8 @@ struct GameSettingsFace: View {
     let layout: PopupLayout
     /// The card's final size.
     let size: CGSize
-    @Bindable var model: GamePopupModel
-
-    private static let screenSizes = ["Fit the display", "1024 × 768", "800 × 600", "640 × 480"]
+    let model: GamePopupModel
+    @Bindable private var store = GameSettingsStore.shared
 
     var body: some View {
         // Full spacing only on the inner display in landscape.
@@ -40,24 +39,26 @@ struct GameSettingsFace: View {
 
             SettingRow("Reduced-precision x87",
                        detail: "Much faster Direct3D 8 games. Off computes floating point exactly, slowly.") {
-                Toggle("Reduced-precision x87", isOn: $model.x87)
+                Toggle("Reduced-precision x87", isOn: $store[game.id].reducedPrecisionX87)
                     .labelsHidden()
                     .tint(Theme.accent)
             }
             SettingRow("Screen size", detail: "The size of the Windows screen the game runs on.") {
                 Menu {
-                    Picker("Screen size", selection: $model.screenSize) {
-                        ForEach(Self.screenSizes, id: \.self) { Text($0) }
+                    Picker("Screen size", selection: $store[game.id].screenSize) {
+                        ForEach(GameSettings.ScreenSize.allCases, id: \.self) { Text($0.label) }
                     }
                 } label: {
-                    MenuLabel(model.screenSize)
+                    MenuLabel(store[game.id].screenSize.label)
                 }
             }
             SettingRow("Controls", detail: "How touch reaches the game.") {
                 Menu {
-                    Button("Touch as mouse") {}
+                    Picker("Controls", selection: $store[game.id].controls) {
+                        ForEach(GameSettings.Controls.allCases, id: \.self) { Text($0.label) }
+                    }
                 } label: {
-                    MenuLabel("Touch as mouse")
+                    MenuLabel(store[game.id].controls.label)
                 }
             }
             Spacer(minLength: 0)

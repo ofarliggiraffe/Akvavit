@@ -107,10 +107,6 @@ struct TryOutSection: View {
     /// A landscape desktop 768 pixels high, in the shape of this window (the
     /// display the app is on: the Duo's inner and outer ones differ).
     static func desktopSize() -> (Int, Int) {
-        let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        let size = scene?.effectiveGeometry.coordinateSpace.bounds.size ?? CGSize(width: 4, height: 3)
-        let aspect = max(size.width, size.height) / max(min(size.width, size.height), 1)
-        let width = Int((768 * aspect / 8).rounded()) * 8
-        return (width, 768)
+        PlayStart.fittingSize()
     }
 }

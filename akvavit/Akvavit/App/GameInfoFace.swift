@@ -92,14 +92,34 @@ struct GameInfoFace: View {
     }
 
     private func actions(compact: Bool) -> some View {
-        VStack(spacing: compact ? 10 : 12) {
+        let play = model.play
+        let blocked = play.blocked
+        return VStack(spacing: compact ? 10 : 12) {
+            if let note = play.problem ?? blocked {
+                Text(note)
+                    .font(.quicksand(compact ? 13 : 14, .semibold, relativeTo: .footnote))
+                    .foregroundStyle(Theme.destructive)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Button {
-                // Step 3: starts the game.
+                Task { await play.play(game) }
             } label: {
-                Label("Play", systemImage: "play.fill")
+                if let step = play.step {
+                    HStack(spacing: 10) {
+                        ProgressView().tint(.white)
+                        Text(step)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                    }
+                } else {
+                    Label("Play", systemImage: "play.fill")
+                }
             }
             .buttonStyle(FilledButtonStyle(color: Theme.accent, height: compact ? 56 : 58,
                                            fontSize: compact ? 19 : 20))
+            .disabled(play.busy || blocked != nil)
+            .opacity(blocked != nil ? 0.55 : 1)
             HStack(spacing: compact ? 10 : 12) {
                 Button {
                     model.showSettings()
@@ -108,7 +128,7 @@ struct GameInfoFace: View {
                 }
                 .buttonStyle(OutlineButtonStyle(fontSize: compact ? 15 : 16))
                 Button {
-                    model.confirmingUninstall = true
+                    model.askUninstall()
                 } label: {
                     Label("Uninstall", systemImage: "trash")
                 }
@@ -186,22 +206,34 @@ private struct UninstallConfirmation: View {
         ZStack {
             Theme.cardDim
                 .contentShape(.rect)
-                .onTapGesture { model.confirmingUninstall = false }
+                .onTapGesture { model.cancelUninstall() }
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 10) {
                 Text("Uninstall \(game.name)?")
                     .font(.quicksand(20, .bold, relativeTo: .title3))
                 Text((game.sizeOnDisk.map { "This deletes its \(GameFacts.size($0)) of game files." } ?? "This deletes its game files.")
                      + " You can install it again from Get games.")
+                if let error = model.uninstallError {
+                    Text(error)
+                        .font(.quicksand(14, .semibold, relativeTo: .footnote))
+                        .foregroundStyle(Theme.destructive)
+                }
                 HStack(spacing: 10) {
-                    Button("Cancel") { model.confirmingUninstall = false }
+                    Button("Cancel") { model.cancelUninstall() }
                         .buttonStyle(OutlineButtonStyle(fontSize: 16, height: 46))
-                    Button("Uninstall") {
-                        // Spike: nothing is deleted yet (step 3).
-                        model.close()
+                    Button {
+                        Task { await model.uninstall() }
+                    } label: {
+                        if model.uninstalling {
+                            ProgressView().tint(.white)
+                        } else {
+                            Text("Uninstall")
+                        }
                     }
                     .buttonStyle(FilledButtonStyle(color: Theme.destructiveFill, height: 46, fontSize: 16))
+                    .accessibilityLabel(model.uninstalling ? "Uninstalling" : "Uninstall")
                 }
+                .disabled(model.uninstalling)
                 .padding(.top, 8)
             }
             .font(.quicksand(15, .semibold, relativeTo: .body))

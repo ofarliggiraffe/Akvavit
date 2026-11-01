@@ -35,13 +35,15 @@ final class GamePopupModel {
     /// Fade in place instead of flying (Reduce Motion, or the cover is gone).
     private(set) var crossfade = false
     private(set) var settingsShown = false
-    var confirmingUninstall = false
+    private(set) var confirmingUninstall = false
     /// Changes to rebuild the card at its current values, dropping animations.
     private(set) var cardID = 0
 
-    // Spike only: game settings, until step 3 keeps them per game.
-    var x87 = true
-    var screenSize = "Fit the display"
+    /// Play's steps and problems.
+    let play = PlayStart()
+    /// The confirmed uninstall is running; the card waits for it.
+    private(set) var uninstalling = false
+    private(set) var uninstallError: String?
 
     private var generation = 0
     private var began = false
@@ -72,6 +74,8 @@ final class GamePopupModel {
         crossfade = reduceMotion
         settingsShown = false
         confirmingUninstall = false
+        uninstallError = nil
+        play.clearProblem()
         began = false
         phase = .opening
         // The card appears at the cover first; begin() moves it once it is on screen.
@@ -105,7 +109,7 @@ final class GamePopupModel {
     }
 
     func close() {
-        guard phase == .open, !tipping else { return }
+        guard phase == .open, !tipping, !uninstalling else { return }
         generation += 1
         let gen = generation
         phase = .closing
@@ -153,9 +157,35 @@ final class GamePopupModel {
         }
     }
 
+    func askUninstall() {
+        uninstallError = nil
+        confirmingUninstall = true
+    }
+
+    func cancelUninstall() {
+        guard !uninstalling else { return }
+        confirmingUninstall = false
+    }
+
+    /// Uninstalls the open game; the popup closes when it is done, or the
+    /// confirmation says what went wrong.
+    func uninstall() async {
+        guard let game, phase == .open, !uninstalling else { return }
+        uninstalling = true
+        uninstallError = nil
+        do {
+            try await Steam.shared.uninstall(game.appID)
+            uninstalling = false
+            close()
+        } catch {
+            uninstalling = false
+            uninstallError = error.localizedDescription
+        }
+    }
+
     /// A tap outside the card, or VoiceOver's escape: one level at a time.
     func back() {
-        guard phase == .open, !tipping else { return }
+        guard phase == .open, !tipping, !uninstalling else { return }
         if confirmingUninstall {
             confirmingUninstall = false
         } else if settingsShown {

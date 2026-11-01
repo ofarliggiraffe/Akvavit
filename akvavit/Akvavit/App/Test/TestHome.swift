@@ -28,7 +28,6 @@ struct TestHome: View {
             .navigationTitle("Akvavit (test)")
             .clearNavigationBackground()
         }
-        .fullScreenCover(isPresented: $showingGame) { GameScreen() }
     }
 }
 

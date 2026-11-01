@@ -16,10 +16,11 @@ Written for Akvavit. Where a file stands in for something of Madeira's, it says 
 |---|---|
 | `project.yml` | The project. Its project-level build settings are the values Madeira's project sets, so Madeira's files compile the same way. |
 | `App/AkvavitApp.swift` | The app's entry point. |
-| `App/RootView.swift`, `App/TabColumn.swift`, `App/Theme.swift`, `App/LibraryView.swift`, `App/GameGrid.swift`, `App/CoverView.swift`, `App/GamePopup.swift`, `App/GameInfoFace.swift`, `App/GameSettingsFace.swift` | The interface, as the user designed it (the mockup canvas): tab column, theme, library grid, the game popup with its flip and settings side. |
+| `App/RootView.swift`, `App/TabColumn.swift`, `App/Theme.swift`, `App/LibraryView.swift`, `App/GameGrid.swift`, `App/CoverView.swift`, `App/GamePopup.swift`, `App/GameInfoFace.swift`, `App/GameSettingsFace.swift`, `App/Play.swift` | The interface, as the user designed it (the mockup canvas): tab column, theme, library grid, the game popup with its flip and settings side, and what Play does before a game starts (JIT, Valve's client files). |
 | `App/Test/*` | **Temporary test screens**, only for checking AkvavitKit on the device. The real interface replaces all of them. |
 | `Kit/Steam.swift` | Sign-in (on SwiftSteam's sign-in model), the account's games, downloads, uninstall, Valve's client files. **For now it uses Madeira's `MadeiraDock.games` (installed games), `SteamRuntimeInstaller` (Valve's client files), and for uninstall `SteamInstallFiles.delete` and Dock's install ledger.** |
 | `Kit/Games.swift` | One game list for the interface: installed games from the install records (offline; through Madeira's `MadeiraDock.games` and `SteamInstallFiles.sizeOnDisk`), the account's games from Steam, a disk cache. |
+| `Kit/GameSettings.swift` | Each game's settings (x87, screen size, controls), kept in one file, and the start they make (`LaunchConfig`). |
 | `Kit/SteamFacts.swift` | Release years (a product-info request of our own, read with SwiftSteam's `VDFParser`) and the account's playtime (our own `Player.GetOwnedGames` request and reply, written from the public message format with SwiftSteam's protobuf encoder and decoder). |
 | `Kit/Covers.swift` | Covers from Steam's CDN: download, disk cache, downsampled decoding, memory cache. |
 | `Kit/Session.swift` | Starting and watching a Windows session: `LaunchConfig` → environment, then the engine's start calls. **For now it uses Madeira's `StikJITHelper` for the JIT pool and the debugger detach.** |
