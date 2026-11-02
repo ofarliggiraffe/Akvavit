@@ -8,9 +8,9 @@
 // - JIT, and Steam's client files when they are missing: what Play does
 //   before the session (the app reports them here, `prepare`).
 // - Windows: the session's own start steps (Session).
-// - One-time installs (Steam starts that have any): the line the install
-//   batch writes as each program starts and ends (DockInstallers' result
-//   file, read with DockInstallScripts.results).
+// - One-time installs (starts that have any): the line the install batch
+//   writes as each program starts and ends (DockInstallers' result file, or
+//   GOGStart's in the same format; read with DockInstallScripts.results).
 // - Steam: Madeira Dock's report (MadeiraDock.pollReport): signing in, the
 //   licence, Steam starting the game, problems.
 // - The game: up when a visible window that has drawn something belongs to a
@@ -88,6 +88,8 @@ public final class StartProgress {
     @ObservationIgnored private var desktop = false
     @ObservationIgnored private var gameFolder: String?
     @ObservationIgnored private var installsRunning = false
+    /// Where the installs write their progress (Dock's file unless given).
+    @ObservationIgnored private var installsResult: URL?
     /// When a game window was first seen drawn, and how much it had drawn.
     @ObservationIgnored private var sighting: (time: Date, draws: UInt64)?
     @ObservationIgnored private var timer: Timer?
@@ -145,6 +147,7 @@ public final class StartProgress {
         game = nil
         stopped = false
         gameFolder = nil
+        installsResult = nil
         sighting = nil
         gameIsUp = false
         asking = nil
@@ -161,13 +164,14 @@ public final class StartProgress {
 
     /// The game's folder (its Windows path), and whether one-time installs
     /// run first; `installsOnly`: they are all this session runs.
-    func prepared(gameFolder: String, installs: Bool, installsOnly: Bool) {
+    func prepared(gameFolder: String, installs: Bool, installsOnly: Bool, result: URL? = nil) {
         self.gameFolder = gameFolder.lowercased().hasSuffix("\\") ? gameFolder.lowercased() : gameFolder.lowercased() + "\\"
         installsRunning = installs
+        installsResult = result
         if installsOnly {
             steps = before + [.windows, .installs]
         } else if installs {
-            steps = before + [.windows, .installs, .steam, .game]
+            steps = before + [.windows, .installs] + (steps.contains(.steam) ? [.steam] : []) + [.game]
         }
         if installs {
             truth[.installs] = Line(status: .waiting, detail: "What the game needs")
@@ -318,7 +322,7 @@ public final class StartProgress {
 
     private func readInstalls() {
         guard installsRunning || truth[.installs]?.status == .now else { return }
-        let file = MadeiraDock.drive.appendingPathComponent(DockInstallers.resultName)
+        let file = installsResult ?? MadeiraDock.drive.appendingPathComponent(DockInstallers.resultName)
         guard let data = try? Data(contentsOf: file), data.count <= 16384 else { return }
         let results = DockInstallScripts.results(String(decoding: data, as: UTF8.self))
         if let running = results.running {
@@ -328,7 +332,11 @@ public final class StartProgress {
             installsRunning = false
             let failed = results.exits.values.filter { !DockInstallScripts.Results.succeeded($0) }.count
             set(.installs, .done, failed == 0 ? "Done" : "Done, \(failed) of \(max(results.total, results.exits.count)) didn't finish")
-            if steps.contains(.steam), truth[.steam]?.status == .waiting { set(.steam, .now, "Starting Steam") }
+            if steps.contains(.steam), truth[.steam]?.status == .waiting {
+                set(.steam, .now, "Starting Steam")
+            } else if !steps.contains(.steam), truth[.game]?.status == .waiting {
+                set(.game, .now, "Starting game")
+            }
         }
     }
 
@@ -413,7 +421,7 @@ public final class StartProgress {
                 ? String(detail.dropFirst("Installing ".count).prefix { $0 != "·" }).trimmingCharacters(in: .whitespaces)
                 : "An installer"
             asking = Asking(title: "An installer is asking something",
-                            detail: "\(name), one of Steam’s one-time installs for this game, has a window open that may need an answer.",
+                            detail: "\(name), one of the game's one-time installs, has a window open that may need an answer.",
                             window: candidate.id)
         } else if candidate.program.contains("\\steam\\") && !candidate.program.contains("\\steamapps\\") {
             asking = Asking(title: "Steam is asking something",

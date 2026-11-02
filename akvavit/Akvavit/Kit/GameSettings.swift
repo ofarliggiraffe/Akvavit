@@ -107,6 +107,7 @@ extension LaunchConfig {
                       screenWidth: size.width, screenHeight: size.height,
                       reducedPrecisionX87: settings.reducedPrecisionX87,
                       gameFolder: GOGInstalls.record(game.appID).map(GOGStart.windowsFolder))
+            installsResult = GOGStart.pendingInstallsResult(game.appID)
         }
     }
 }

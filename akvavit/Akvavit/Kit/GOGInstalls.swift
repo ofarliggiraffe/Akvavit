@@ -8,12 +8,15 @@
 //   <id>.json          an installed game: name, build, folder
 //   <id>.files.json    its files with their chunks (for checks and updates)
 //   <id>.partial.json  a download under way or stopped: the files done so far
+//
+// and, for the whole prefix, the installers of what games need that have run
+// (dependencies.json; GOGStart).
 
 import Foundation
 
 enum GOGInstalls {
     static var root: URL { MadeiraDock.drive.appendingPathComponent("GOG Games", isDirectory: true) }
-    private static var records: URL { root.appendingPathComponent(".akvavit", isDirectory: true) }
+    static var records: URL { root.appendingPathComponent(".akvavit", isDirectory: true) }
 
     /// An installed game.
     struct Record: Codable {
@@ -27,6 +30,20 @@ enum GOGInstalls {
         var size: Int64
         /// GOG's dependency IDs the build lists (Visual C++, OpenAL…).
         var dependencies: [String]
+        /// The installers among them that were downloaded, to run once per
+        /// prefix before the game (optional: records from before step 4).
+        var installers: [Installer]?
+    }
+
+    /// An installer of something a game needs, in the game's folder.
+    struct Installer: Codable {
+        /// GOG's dependency ID ("MSVC2005").
+        var id: String
+        /// Its name for people ("Visual C++ Redist 2005").
+        var name: String
+        /// Relative to the game's folder, with `/`.
+        var program: String
+        var arguments: String
     }
 
     /// One file of an installed game.
@@ -106,12 +123,12 @@ enum GOGInstalls {
         records.appendingPathComponent("\(id).\(suffix)")
     }
 
-    private static func read<T: Decodable>(_ type: T.Type, _ url: URL) -> T? {
+    static func read<T: Decodable>(_ type: T.Type, _ url: URL) -> T? {
         guard let data = try? Data(contentsOf: url) else { return nil }
         return try? JSONDecoder().decode(type, from: data)
     }
 
-    private static func write(_ value: some Encodable, to url: URL) throws {
+    static func write(_ value: some Encodable, to url: URL) throws {
         try FileManager.default.createDirectory(at: records, withIntermediateDirectories: true)
         try JSONEncoder().encode(value).write(to: url, options: .atomic)
     }

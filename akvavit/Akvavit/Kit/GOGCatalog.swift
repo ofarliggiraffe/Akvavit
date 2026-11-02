@@ -168,6 +168,46 @@ enum GOGCatalog {
         "\(hash.prefix(2))/\(hash.dropFirst(2).prefix(2))/\(hash)"
     }
 
+    // MARK: Dependencies
+
+    /// Something GOG installs beside games (Visual C++, OpenAL, DirectX), or a
+    /// tool it places for them (DOSBox, ScummVM: `internal`, nothing to run).
+    /// Its files go into the game's folder at their depot paths
+    /// (`__redist/<id>/…`, `DOSBOX/…`), as GOG's own installers put them.
+    struct Dependency: Decodable {
+        struct Executable: Decodable {
+            let path: String
+            let arguments: String?
+        }
+        let dependencyId: String
+        let readableName: String?
+        let executable: Executable?
+        let `internal`: Bool?
+        let manifest: String
+    }
+
+    /// GOG's dependency catalogue: content-system.gog.com/dependencies/repository
+    /// links the catalogue itself (zlib JSON).
+    static func dependencies() async throws -> [Dependency] {
+        struct Repository: Decodable { let repository_manifest: String }
+        struct Catalogue: Decodable { let depots: [Dependency] }
+        let repository = try JSONDecoder().decode(Repository.self, from: try await get(
+            URL(string: "https://content-system.gog.com/dependencies/repository?generation=2")!))
+        guard let url = URL(string: repository.repository_manifest) else { throw GOGAccount.Failure.unreadable }
+        return try JSONDecoder().decode(Catalogue.self, from: try inflated(try await get(url))).depots
+    }
+
+    /// A dependency's files (its manifest sits apart from games').
+    static func dependencyItems(_ manifest: String) async throws -> [DepotItem] {
+        struct Reply: Decodable {
+            struct Depot: Decodable { let items: [DepotItem] }
+            let depot: Depot
+        }
+        guard manifest.count > 4, manifest.allSatisfy(\.isHexDigit) else { throw GOGAccount.Failure.unreadable }
+        let url = URL(string: "https://cdn.gog.com/content-system/v2/dependencies/meta/" + storePath(manifest))!
+        return try JSONDecoder().decode(Reply.self, from: try inflated(try await get(url))).depot.items
+    }
+
     /// About how much the newest build downloads and takes on disk.
     static func sizes(_ id: Int) async throws -> (download: Int64, install: Int64)? {
         guard let build = try await builds(id).first else { return nil }

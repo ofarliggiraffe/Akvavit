@@ -35,6 +35,9 @@ public struct LaunchConfig: Sendable {
     /// The game's folder (a Windows path) for a desktop start that isn't
     /// Steam's: the game is up when a window of a program in it has drawn.
     public var gameFolder: String?
+    /// One-time installs run first: the file they write their progress to
+    /// (Madeira Dock's format), for the loading screen.
+    var installsResult: URL?
 
     public init(program: Program, screenWidth: Int = 1024, screenHeight: Int = 768,
                 reducedPrecisionX87: Bool = false, extraEnvironment: [String: String] = [:],
@@ -127,7 +130,8 @@ public final class Session {
 
         guard case .steam(let appID, let arguments) = config.program else {
             if let folder = config.gameFolder, config.isDesktop {
-                StartProgress.shared.prepared(gameFolder: folder, installs: false, installsOnly: false)
+                StartProgress.shared.prepared(gameFolder: folder, installs: config.installsResult != nil,
+                                              installsOnly: false, result: config.installsResult)
             }
             launch(config, environment: Self.environment(for: config))
             return

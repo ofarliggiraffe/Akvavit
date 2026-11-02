@@ -10,7 +10,11 @@
 //      the md5 of the compressed bytes, reached through a signed link per
 //      product that expires (`secure_link`, signed in). Every chunk is
 //      checked twice (compressed and plain md5) and written into its file at
-//      its offset; a few download at once.
+//      its offset; a few download at once;
+//   4. what the game needs from GOG's dependency catalogue (Visual C++,
+//      OpenAL; tools like DOSBox), into the game's folder the same way, from
+//      a public link (`open_link`). What this build supplies itself is left
+//      out (AkvavitInstallScripts.available, the rules Steam games use).
 //
 // A stopped download keeps a journal of the files it finished; installing
 // again does the rest. Newer builds also pack small files into one container
@@ -64,6 +68,35 @@ struct GOGDownloader {
                 }
             }
         }
+        // What the game needs, and the installers among it (run once per prefix: GOGStart).
+        var installers: [GOGInstalls.Installer] = []
+        if let ids = manifest.dependencies, !ids.isEmpty {
+            let supplied = await MainActor.run { AkvavitInstallScripts.available }
+            let catalogue = try await GOGCatalog.dependencies()
+            for id in ids {
+                guard let dependency = catalogue.first(where: { $0.dependencyId.caseInsensitiveCompare(id) == .orderedSame }) else {
+                    LogStore.shared.log("[gog] \(productID) needs \(id), which GOG's catalogue doesn't list")
+                    continue
+                }
+                let runs = dependency.internal != true && dependency.executable != nil
+                if runs, let what = GOGStart.supplied(dependency.dependencyId), supplied.contains(what) {
+                    LogStore.shared.log("[gog] \(productID) needs \(id): the app supplies \(what.rawValue)")
+                    continue
+                }
+                for item in try await GOGCatalog.dependencyItems(dependency.manifest) where item.type == "DepotFile" {
+                    files.append(PlannedFile(path: try Self.safePath(item.path), product: ChunkLinks.dependencies,
+                                             chunks: item.chunks ?? []))
+                }
+                if runs, let program = dependency.executable {
+                    installers.append(GOGInstalls.Installer(id: dependency.dependencyId,
+                                                            name: dependency.readableName ?? dependency.dependencyId,
+                                                            program: try Self.safePath(program.path),
+                                                            arguments: program.arguments ?? ""))
+                }
+                LogStore.shared.log("[gog] \(productID) needs \(id)" + (runs ? " (installer)" : " (placed)"))
+            }
+        }
+
         // A later depot's file wins (GOG lists language files after the shared ones).
         var seen = Set<String>()
         files = Array(files.reversed().filter { seen.insert($0.path.lowercased()).inserted }.reversed())
@@ -150,7 +183,7 @@ struct GOGDownloader {
         let record = GOGInstalls.Record(productID: productID, name: name, buildID: build.build_id,
                                         version: build.version_name, folder: folderName,
                                         size: files.reduce(0) { $0 + $1.size },
-                                        dependencies: manifest.dependencies ?? [])
+                                        dependencies: manifest.dependencies ?? [], installers: installers)
         try GOGInstalls.save(record, files: files.map {
             GOGInstalls.File(path: $0.path, size: $0.size, chunks: $0.chunks.map(\.md5))
         })
@@ -260,8 +293,12 @@ struct GOGDownloader {
 }
 
 /// The signed links to GOG's chunk store, one per product, fetched when
-/// first needed and again when the CDN refuses one.
+/// first needed and again when the CDN refuses one; and the public link to
+/// the dependencies' store (`dependencies`).
 private actor ChunkLinks {
+    /// The "product" of dependencies' files.
+    static let dependencies = "dependencies"
+
     private struct Link {
         let format: String
         let parameters: [String: String]
@@ -273,11 +310,17 @@ private actor ChunkLinks {
     func url(product: String, chunk md5: String) async throws -> URL {
         let link = try await link(product)
         var parameters = link.parameters
-        // The chunk's place in the store goes after the link's own path.
-        let path = (parameters["path"] ?? "").trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        parameters["path"] = "/" + path + "/" + GOGCatalog.storePath(md5)
+        // The chunk's place in the store goes after the link's own path, or
+        // after the whole link when it has no path of its own (dependencies').
+        let chunk = GOGCatalog.storePath(md5)
+        let hasPath = link.format.contains("{path}")
+        if hasPath {
+            let path = (parameters["path"] ?? "").trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            parameters["path"] = "/" + path + "/" + chunk
+        }
         var text = link.format
         for (key, value) in parameters { text = text.replacingOccurrences(of: "{\(key)}", with: value) }
+        if !hasPath { text = text.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + "/" + chunk }
         guard let url = URL(string: text) else { throw GOGAccount.Failure.unreadable }
         return url
     }
@@ -298,9 +341,15 @@ private actor ChunkLinks {
     }
 
     private static func request(_ product: String) async throws -> Link {
-        guard Int(product) != nil else { throw GOGAccount.Failure.unreadable }
-        let url = URL(string: "https://content-system.gog.com/products/\(product)/secure_link?generation=2&path=/&_version=2")!
-        let (data, _) = try await GOGAccount.shared.authorized(url)
+        let data: Data
+        if product == dependencies {
+            data = try await GOGCatalog.get(URL(string:
+                "https://content-system.gog.com/open_link?generation=2&_version=2&path=/dependencies/store/")!)
+        } else {
+            guard Int(product) != nil else { throw GOGAccount.Failure.unreadable }
+            let url = URL(string: "https://content-system.gog.com/products/\(product)/secure_link?generation=2&path=/&_version=2")!
+            data = try await GOGAccount.shared.authorized(url).0
+        }
         guard let reply = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let urls = reply["urls"] as? [[String: Any]], !urls.isEmpty else { throw GOGAccount.Failure.unreadable }
         // GOG lists its CDNs best first.

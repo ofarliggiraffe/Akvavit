@@ -175,6 +175,18 @@ Both can be installed side by side. See "Akvavit's own app" below.
     start-<id>.cmd` (UTF-8 with `chcp 65001`, `cd /d`, then `start "" /d`),
     and a desktop session runs it through `cmd.exe /c`. `LaunchConfig.gameFolder`
     tells the loading screen which programs are the game's.
+  - What games need (`GOGStart`, `GOGDownloader`; **untested**, no GOG game
+    with dependencies tried yet): GOG's catalogue
+    (`content-system.gog.com/dependencies/repository?generation=2` → a zlib
+    catalogue: `dependencyId`, `readableName`, `executable`, `internal`,
+    `manifest`). Their files come through the public `open_link`, whose
+    `url_format` has no `{path}` (append `/aa/bb/<compressedMd5>`), and go
+    into the game's folder at their depot paths (`__redist/<id>/…`,
+    `DOSBOX/…`). What the build supplies is skipped (the Steam rules,
+    `AkvavitInstallScripts.available`). The start file runs the rest first,
+    writing `installs.result` in Dock's format for the loading screen; at
+    the next Play the ones that succeeded go into `dependencies.json`
+    (per prefix) and don't run again.
   - One download queue for every store: `Kit/Downloads.swift` (by game ID),
     which `DownloadActivity` reports. A game start stops all downloads.
   - Store logos (covers, the popup's chip): Wikimedia Commons' public-domain
