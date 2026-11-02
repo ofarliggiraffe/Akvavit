@@ -189,6 +189,16 @@ Both can be installed side by side. See "Akvavit's own app" below.
     (per prefix) and don't run again.
   - One download queue for every store: `Kit/Downloads.swift` (by game ID),
     which `DownloadActivity` reports. A game start stops all downloads.
+  - Update and Check and repair (`GOGDownloader.install(check:)`, through
+    `Downloads.install`/`repair`): one run brings an installed game to GOG's
+    newest build, fetching only files whose chunk md5s differ from the
+    record (with check: every file's chunks are read and compared on disk),
+    and deletes files the new build dropped. `Game.updateAvailable` compares
+    the newest build with the record's. Refused after a session ran this app
+    run (Windows may hold the files). Check and repair verified 2026-11-02
+    (a deleted file came back); Update **untested** (needs a game with a
+    newer build). Buttons only on the temporary Settings › GOG screen until
+    the user designs their place.
   - Store logos (covers, the popup's chip): Wikimedia Commons' public-domain
     Steam and GOG logos, made one-colour, as template images.
 - **App icon** (the user's choice, option C on the icon canvas): `App/AppIcon.icon`

@@ -77,6 +77,9 @@ enum GOGInstalls {
 
     static func journal(_ id: Int) -> Journal? { read(Journal.self, file(id, "partial.json")) }
 
+    /// An installed game's files.
+    static func files(_ id: Int) -> [File] { read([File].self, file(id, "files.json")) ?? [] }
+
     static func hasJournal(_ id: Int) -> Bool { FileManager.default.fileExists(atPath: file(id, "partial.json").path) }
 
     static func save(_ record: Record, files: [File]) throws {

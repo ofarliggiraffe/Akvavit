@@ -17,7 +17,13 @@
 //      out (AkvavitInstallScripts.available, the rules Steam games use).
 //
 // A stopped download keeps a journal of the files it finished; installing
-// again does the rest. Newer builds also pack small files into one container
+// again does the rest.
+//
+// For an installed game the same run is an update or a repair: it brings the
+// game to GOG's newest build, fetching only the files whose chunks differ from
+// the installed record (or, for a repair, that don't match on disk: every file
+// is read and checked chunk by chunk), and deletes the files the new build no
+// longer has. Newer builds also pack small files into one container
 // (`sfcRef`); every file still has its own chunks, which is what this uses.
 
 import CryptoKit
@@ -47,12 +53,15 @@ struct GOGDownloader {
     /// Chunks downloading at once.
     private static let parallel = 4
 
-    func install(report: @escaping @MainActor (GameDownload) -> Void) async throws {
+    /// Installs, updates or (`check`) checks and repairs the game.
+    func install(check: Bool = false, report: @escaping @MainActor (GameDownload) -> Void) async throws {
         await report(GameDownload(phase: .preparing, fraction: 0, doneBytes: 0, totalBytes: 0, bytesPerSecond: 0))
         guard let build = try await GOGCatalog.builds(productID).first else { throw Failure.noBuild }
         let manifest = try await GOGCatalog.buildManifest(build)
-        if let record = GOGInstalls.record(productID), record.buildID == build.build_id { return }
-        LogStore.shared.log("[gog] install \(productID) build=\(build.build_id) \(build.version_name ?? "")"
+        let installed = GOGInstalls.record(productID)
+        if let installed, installed.buildID == build.build_id, !check { return }
+        let kind = installed == nil ? "install" : check ? "check" : "update from \(installed!.buildID)"
+        LogStore.shared.log("[gog] \(kind) \(productID) build=\(build.build_id) \(build.version_name ?? "")"
                             + (manifest.scriptInterpreter == true ? " (has an install script, not run)" : ""))
 
         // The files, from every depot of this download.
@@ -101,7 +110,8 @@ struct GOGDownloader {
         var seen = Set<String>()
         files = Array(files.reversed().filter { seen.insert($0.path.lowercased()).inserted }.reversed())
 
-        let folderName = manifest.installDirectory
+        // An installed game keeps its folder.
+        let folderName = installed?.folder ?? manifest.installDirectory
         _ = try Self.safePath(folderName)
         let gameFolder = GOGInstalls.folder(folderName)
         var journal = GOGInstalls.journal(productID)
@@ -109,6 +119,17 @@ struct GOGDownloader {
             journal = GOGInstalls.Journal(buildID: build.build_id, folder: folderName, done: [])
         }
         var done = journal!.done
+
+        // An installed game: the files that are right already stay.
+        let before = installed == nil ? [] : GOGInstalls.files(productID)
+        var unchanged = Set<String>()
+        if installed != nil {
+            unchanged = try await Self.unchanged(files.filter { !done.contains($0.path) }, before: before,
+                                                 in: gameFolder, check: check, report: report)
+            LogStore.shared.log("[gog] \(productID): \(unchanged.count) of \(files.count) files are right already")
+        }
+        let fetching = files.filter { !unchanged.contains($0.path) }
+        done.formUnion(unchanged)
         let toDo = files.filter { !done.contains($0.path) }
 
         // Room for what is left.
@@ -135,8 +156,8 @@ struct GOGDownloader {
         for file in toDo where file.chunks.isEmpty { done.insert(file.path) }
 
         // The chunks.
-        let total = files.reduce(Int64(0)) { $0 + $1.downloadSize }
-        var downloaded = files.filter { done.contains($0.path) }.reduce(Int64(0)) { $0 + $1.downloadSize }
+        let total = fetching.reduce(Int64(0)) { $0 + $1.downloadSize }
+        var downloaded = fetching.filter { done.contains($0.path) }.reduce(Int64(0)) { $0 + $1.downloadSize }
         var left: [String: Int] = [:]
         var jobs: [Job] = []
         for file in toDo where !file.chunks.isEmpty {
@@ -180,6 +201,11 @@ struct GOGDownloader {
         }
 
         await report(meter.report(downloaded, total, phase: .finishing, force: true)!)
+        // Files the new build no longer has.
+        let kept = Set(files.map { $0.path.lowercased() })
+        for old in before where !kept.contains(old.path.lowercased()) {
+            try? FileManager.default.removeItem(at: gameFolder.appendingPathComponent(old.path))
+        }
         let record = GOGInstalls.Record(productID: productID, name: name, buildID: build.build_id,
                                         version: build.version_name, folder: folderName,
                                         size: files.reduce(0) { $0 + $1.size },
@@ -187,7 +213,55 @@ struct GOGDownloader {
         try GOGInstalls.save(record, files: files.map {
             GOGInstalls.File(path: $0.path, size: $0.size, chunks: $0.chunks.map(\.md5))
         })
-        LogStore.shared.log("[gog] installed \(productID): \(files.count) files, \(record.size) bytes")
+        LogStore.shared.log("[gog] \(installed == nil ? "installed" : check ? "checked" : "updated") \(productID): "
+                            + "\(files.count) files, \(fetching.count) fetched, \(record.size) bytes")
+    }
+
+    /// The files that are right already: the same chunks as the installed
+    /// record and the right size on disk, and with `check`, every chunk's md5
+    /// read back from the file.
+    private static func unchanged(_ files: [PlannedFile], before: [GOGInstalls.File], in folder: URL, check: Bool,
+                                  report: @escaping @MainActor (GameDownload) -> Void) async throws -> Set<String> {
+        let old = Dictionary(before.map { ($0.path.lowercased(), $0.chunks) }, uniquingKeysWith: { first, _ in first })
+        let total = files.reduce(Int64(0)) { $0 + $1.size }
+        return try await Task.detached(priority: .utility) {
+            var result = Set<String>()
+            var read: Int64 = 0
+            var lastReport = Date.distantPast
+            for file in files {
+                try Task.checkCancellation()
+                defer { read += file.size }
+                guard old[file.path.lowercased()] == file.chunks.map(\.md5) else { continue }
+                let url = folder.appendingPathComponent(file.path)
+                let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init)
+                guard size == file.size else { continue }
+                if check {
+                    if Date().timeIntervalSince(lastReport) > 0.25 {
+                        lastReport = Date()
+                        let fraction = total > 0 ? Double(read) / Double(total) : 0
+                        await report(GameDownload(phase: .checking, fraction: fraction, doneBytes: UInt64(read),
+                                                  totalBytes: UInt64(total), bytesPerSecond: 0))
+                    }
+                    guard (try? matches(url, file.chunks)) == true else {
+                        LogStore.shared.log("[gog] damaged: \(file.path)")
+                        continue
+                    }
+                }
+                result.insert(file.path)
+            }
+            return result
+        }.value
+    }
+
+    /// Whether the file on disk is its chunks, md5 by md5.
+    private static func matches(_ url: URL, _ chunks: [GOGCatalog.DepotItem.Chunk]) throws -> Bool {
+        let handle = try FileHandle(forReadingFrom: url)
+        defer { try? handle.close() }
+        for chunk in chunks {
+            guard let data = try handle.read(upToCount: Int(chunk.size)), data.count == Int(chunk.size),
+                  md5(data) == chunk.md5 else { return false }
+        }
+        return true
     }
 
     // MARK: Chunks

@@ -33,6 +33,8 @@ public final class Downloads {
     @ObservationIgnored private var tasks: [String: Task<Void, Never>] = [:]
     /// Downloads in order: the first one runs, the others wait.
     @ObservationIgnored private var queue: [String] = []
+    /// Downloads that check every file first (Check and repair).
+    @ObservationIgnored private var checking: Set<String> = []
 
     private init() {}
 
@@ -43,6 +45,13 @@ public final class Downloads {
     /// with iOS showing its progress (DownloadActivity).
     public func install(_ gameID: String) {
         guard tasks[gameID] == nil, let (source, id) = Self.parse(gameID) else { return }
+        // An installed game's files may still be held by Windows' programs.
+        if Games.shared.game(gameID)?.installed == true, Session.shared.needsRestart {
+            var failed = GameDownload.waiting
+            failed.phase = .failed("Windows has run since Akvavit started and may still use the game's files. Close Akvavit, open it again, then try again.")
+            state[gameID] = failed
+            return
+        }
         state[gameID] = .waiting
         queue.append(gameID)
         DownloadActivity.shared.begin(title: "Downloading " + name(gameID))
@@ -53,6 +62,14 @@ public final class Downloads {
             }
             await self?.run(gameID, source, id)
         }
+    }
+
+    /// Checks every file of an installed GOG game, fetches the damaged or
+    /// missing ones, and brings it to GOG's newest build.
+    public func repair(_ gameID: String) {
+        guard tasks[gameID] == nil, gameID.hasPrefix("gog:") else { return }
+        checking.insert(gameID)
+        install(gameID)
     }
 
     /// Stops a download. What is downloaded stays; installing again resumes.
@@ -127,6 +144,7 @@ public final class Downloads {
         var succeeded = false
         defer {
             tasks[gameID] = nil
+            checking.remove(gameID)
             queue.removeAll { $0 == gameID }
             reportActivity(lastSucceeded: succeeded)
             // A stopped download leaves files: the list marks the game.
@@ -142,7 +160,7 @@ public final class Downloads {
         do {
             switch source {
             case .steam: try await Steam.shared.download(id, report: report)
-            case .gog: try await GOGDownloader(productID: id, name: name(gameID)).install(report: report)
+            case .gog: try await GOGDownloader(productID: id, name: name(gameID)).install(check: checking.contains(gameID), report: report)
             }
             state[gameID] = nil
             succeeded = true

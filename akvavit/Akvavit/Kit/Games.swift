@@ -54,6 +54,13 @@ public struct Game: Identifiable, Hashable, Sendable, Codable {
     var headerImage: String?
     /// GOG's vertical cover, an address with `{formatter}` and `{ext}` in it.
     var gogCover: String?
+    /// GOG's newest build, and the installed one (installed GOG games).
+    var gogLatestBuild: String?
+    var gogInstalledBuild: String?
+    /// GOG has a newer version of this installed game.
+    public var updateAvailable: Bool {
+        installed && gogLatestBuild != nil && gogInstalledBuild != nil && gogLatestBuild != gogInstalledBuild
+    }
 
     init(steamAppID: Int, name: String) {
         id = "steam:\(steamAppID)"
@@ -169,6 +176,7 @@ public final class Games {
             game.installed = true
             game.partial = nil
             game.sizeOnDisk = record.size
+            game.gogInstalledBuild = record.buildID
             byID[game.id] = game
         }
         for id in byID.keys where byID[id]!.source == .gog && !byID[id]!.installed {
@@ -251,6 +259,12 @@ public final class Games {
         } catch {
             LogStore.shared.log("[gog] owned list failed: \(GOGAccount.words(error))", level: .error)
             return
+        }
+        // Installed games: whether GOG has a newer build.
+        for game in byID.values where game.source == .gog && game.installed {
+            if let build = try? await GOGCatalog.builds(game.appID).first {
+                byID[game.id]?.gogLatestBuild = build.build_id
+            }
         }
         // These don't change (sizes only with an update): ask for missing ones, a few at a time.
         let missing = byID.values.filter { $0.source == .gog && ($0.gogCover == nil || $0.downloadSize == nil) }.map(\.appID)
