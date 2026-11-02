@@ -59,38 +59,3 @@ struct GOGTestView: View {
         }
     }
 }
-
-/// GOG's sign-in page. It stops at the page GOG ends on and hands over the
-/// code. Nothing of the page (cookies, storage) is kept afterwards.
-private struct GOGSignInPage: UIViewRepresentable {
-    let done: (String) -> Void
-
-    func makeCoordinator() -> Coordinator { Coordinator(done: done) }
-
-    func makeUIView(context: Context) -> WKWebView {
-        let configuration = WKWebViewConfiguration()
-        configuration.websiteDataStore = .nonPersistent()
-        let view = WKWebView(frame: .zero, configuration: configuration)
-        view.navigationDelegate = context.coordinator
-        view.load(URLRequest(url: GOGAccount.shared.signInURL))
-        return view
-    }
-
-    func updateUIView(_ view: WKWebView, context: Context) {}
-
-    @MainActor final class Coordinator: NSObject, WKNavigationDelegate {
-        let done: (String) -> Void
-        private var finished = false
-
-        init(done: @escaping (String) -> Void) { self.done = done }
-
-        func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction) async -> WKNavigationActionPolicy {
-            guard let url = action.request.url, let code = GOGAccount.shared.signInCode(in: url) else { return .allow }
-            if !finished {
-                finished = true
-                done(code)
-            }
-            return .cancel
-        }
-    }
-}

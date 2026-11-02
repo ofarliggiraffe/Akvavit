@@ -3,7 +3,8 @@
 // The app's one screen: the tab column on the left, the selected tab's content
 // beside it, the game popup above them, the controls studio over all of that
 // while it is open, a session's screen over everything while a game starts
-// and runs, and setup on first start (or when run again from Settings).
+// and runs, a store's sign-in card from Get games, and setup on first start
+// (or when run again from Settings).
 
 import AkvavitKit
 import SwiftUI
@@ -51,7 +52,11 @@ struct RootView: View {
                     .transition(.opacity)
                     .zIndex(3)
             }
-            // Outside `main`, which ignores the keyboard: setup's card makes room for it.
+            // Outside `main`, which ignores the keyboard: these cards make room for it.
+            if let store = SignInCards.shared.store {
+                SignInCardLayer(store: store)
+                    .zIndex(4)
+            }
             if !SetupFlow.shared.isDone {
                 SetupView()
             }

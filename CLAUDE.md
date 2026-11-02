@@ -53,7 +53,13 @@ Both can be installed side by side. See "Akvavit's own app" below.
 ## Layout
 
 - The repository root is Madeira's tree. Branch `akvavit` (the default) is
-  Madeira's `main` plus our commits. Remotes: `origin` = our fork,
+  Madeira's `main` plus our commits.
+- **Work goes on a working branch, into `akvavit` by pull request** (the
+  user, 2026-11-02). For now one branch, `WorkingOnThings`, as a lot is
+  being built at once; later a branch per feature. Commit there (not on
+  `akvavit`), push it when asked; the user opens and merges the PRs on
+  GitHub (`gh` isn't installed). After a merge, bring the branch up to date
+  with `akvavit` before going on. Steps needn't be separate commits. Remotes: `origin` = our fork,
   `upstream` = `willfaust/madeira`. Never push upstream's branches to
   `origin` (Madeira's CI workflow is disabled in the fork).
 - Keep changes to Madeira's files small, so merges stay easy. Put the logic in
@@ -385,9 +391,8 @@ Both can be installed side by side. See "Akvavit's own app" below.
     (wait for Wine to stop, then show the app; a second game still needs a
     restart). Madeira can't quit a game either. It belongs with the real
     in-game menu.
-  - Launch options other than Steam's first.
-  - Per-game settings files.
-  - Background downloads.
+  - Launch options other than Steam's first, and per-game fixes (e.g.
+    Skyrim: skip its launcher, preset its graphics file).
 
 ## Updating Madeira
 

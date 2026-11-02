@@ -11,10 +11,6 @@ struct GetGamesView: View {
     private let games = Games.shared
     @State private var query = ""
     @State private var source = SourceFilter.all
-    @State private var signingIn: Store?
-
-    /// Where a sign-in sheet signs in.
-    enum Store: String, Identifiable { case steam, gog; var id: Self { self } }
 
     enum SourceFilter: String, CaseIterable, Identifiable {
         case all = "All", steam = "Steam", gog = "GOG"
@@ -39,13 +35,6 @@ struct GetGamesView: View {
                 .padding(.top, 12)
             content
         }
-        .sheet(item: $signingIn) { store in
-            // Temporary: the test screens' sign-in, until setup's is built.
-            switch store {
-            case .steam: NavigationStack { SteamTestView(showingGame: .constant(false)) }
-            case .gog: NavigationStack { GOGTestView() }
-            }
-        }
     }
 
     @ViewBuilder
@@ -54,7 +43,7 @@ struct GetGamesView: View {
         if source == .gog ? !gogSignedIn : (source == .steam || !gogSignedIn) && !signedIn {
             let store = source == .gog ? "GOG" : "Steam"
             note("Sign in to \(store) to see your games. Installed games still play from the Library.") {
-                Button("Sign in to \(store)") { signingIn = source == .gog ? .gog : .steam }
+                Button("Sign in to \(store)") { SignInCards.shared.open(source == .gog ? .gog : .steam) }
                     .buttonStyle(FilledButtonStyle(color: Theme.getGamesColors.tint, height: 48, fontSize: 17))
                     .frame(maxWidth: 240)
             }
@@ -85,8 +74,10 @@ struct GetGamesView: View {
 
     private var emptyText: String {
         let text = query.trimmingCharacters(in: .whitespaces)
-        if games.refreshing && games.available.isEmpty { return "Loading your games…" }
-        if !text.isEmpty { return "No game matches “\(text)”." }
+        // Nothing to show while Steam or GOG is still being asked: they may
+        // bring some (the other store's games can be there already).
+        if !text.isEmpty && !games.refreshing { return "No game matches “\(text)”." }
+        if games.refreshing { return "Refreshing your games…" }
         return "Every game you own is installed."
     }
 

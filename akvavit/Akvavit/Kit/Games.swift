@@ -110,6 +110,7 @@ public final class Games {
 
     private var byID: [String: Game] = [:]
     public private(set) var refreshing = false
+    @ObservationIgnored private var refreshAgain = false
 
     /// Installed games, by name.
     public var library: [Game] { sorted(byID.values.filter(\.installed)) }
@@ -201,12 +202,21 @@ public final class Games {
 
     /// Asks Steam and GOG (where signed in) for the account's games and their
     /// facts. Without a connection the list stays as it was.
+    /// A refresh asked for while one runs (a sign-in meanwhile) runs after it.
     public func refresh() async {
-        guard !refreshing else { return }
+        guard !refreshing else {
+            refreshAgain = true
+            return
+        }
         refreshing = true
         defer { refreshing = false }
-        if SteamSignIn.isSignedIn { await refreshSteam() }
-        if GOGAccount.shared.isSignedIn { await refreshGOG() }
+        repeat {
+            refreshAgain = false
+            // A store signed out of keeps only its installed games (also ones
+            // a list saved before the sign-out still has).
+            if SteamSignIn.isSignedIn { await refreshSteam() } else { forgetAccount() }
+            if GOGAccount.shared.isSignedIn { await refreshGOG() } else { forgetGOG() }
+        } while refreshAgain
     }
 
     /// Steam's games, then their release years and the playtime.
@@ -214,6 +224,8 @@ public final class Games {
         let steam = Steam.shared
         do {
             let owned = try await steam.ownedApps()
+            // Signed out while Steam answered: its games went with the account.
+            guard SteamSignIn.isSignedIn else { return }
             mergeOwned(owned)
             save()
         } catch {
@@ -231,6 +243,7 @@ public final class Games {
         }
         do {
             let minutes = try await steam.playtimes()
+            guard SteamSignIn.isSignedIn else { return }
             for id in byID.keys where byID[id]!.source == .steam {
                 byID[id]!.playtimeMinutes = minutes[byID[id]!.appID]
             }
@@ -268,6 +281,7 @@ public final class Games {
     private func refreshGOG() async {
         do {
             let products = try await GOGCatalog.products(try await GOGCatalog.ownedIDs())
+            guard GOGAccount.shared.isSignedIn else { return }
             mergeOwnedGOG(products.filter(\.installableOnWindows))
             save()
         } catch {
