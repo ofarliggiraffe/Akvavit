@@ -1,22 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// One list of games for the interface, from every source (Steam for now).
+// One list of games for the interface, from every source (Steam and GOG).
 //
 // It works offline: installed games come from the install records in the
 // prefix, and the last full list is kept on disk, so names, covers and facts
-// show at once. What Steam says (owned games, release years, playtime) merges
-// in when it arrives.
+// show at once. What Steam and GOG say (owned games, release years, playtime)
+// merges in when it arrives.
 
 import Foundation
 import Observation
 
 public struct Game: Identifiable, Hashable, Sendable, Codable {
-    public enum Source: String, Sendable, Codable { case steam }
+    public enum Source: String, Sendable, Codable { case steam, gog }
 
-    /// "steam:<app ID>".
+    /// "steam:<app ID>" or "gog:<product ID>".
     public let id: String
     public let source: Source
-    /// Steam's app ID.
+    /// The store's ID: Steam's app ID or GOG's product ID.
     public let appID: Int
     public internal(set) var name: String
     public internal(set) var installed: Bool
@@ -42,6 +42,8 @@ public struct Game: Identifiable, Hashable, Sendable, Codable {
     /// on Steam's CDN).
     var capsuleImage: String?
     var headerImage: String?
+    /// GOG's vertical cover, an address with `{formatter}` and `{ext}` in it.
+    var gogCover: String?
 
     init(steamAppID: Int, name: String) {
         id = "steam:\(steamAppID)"
@@ -52,8 +54,24 @@ public struct Game: Identifiable, Hashable, Sendable, Codable {
         installable = false
     }
 
+    init(gogProductID: Int, name: String) {
+        id = "gog:\(gogProductID)"
+        source = .gog
+        appID = gogProductID
+        self.name = name
+        installed = false
+        installable = false
+    }
+
     /// Where its cover can be found, best first.
     public var coverURLs: [URL] {
+        if source == .gog {
+            guard let gogCover else { return [] }
+            return ["_glx_vertical_cover", ""].compactMap { formatter in
+                URL(string: gogCover.replacingOccurrences(of: "{formatter}", with: formatter)
+                    .replacingOccurrences(of: "{ext}", with: "jpg"))
+            }
+        }
         let base = "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/\(appID)/"
         var names: [String] = []
         if let capsuleImage { names.append(capsuleImage) }
@@ -100,7 +118,7 @@ public final class Games {
         let installed = MadeiraDock.games(drive: drive).filter { $0.installed && !Self.notGames.contains($0.id) }
         for id in Self.notGames { byID["steam:\(id)"] = nil }
         let installedIDs = Set(installed.map { "steam:\($0.id)" })
-        for id in byID.keys where byID[id]!.installed && !installedIDs.contains(id) {
+        for id in byID.keys where byID[id]!.source == .steam && byID[id]!.installed && !installedIDs.contains(id) {
             byID[id]!.installed = false
             byID[id]!.sizeOnDisk = nil
         }
@@ -116,7 +134,7 @@ public final class Games {
         let common = drive.appendingPathComponent(SteamInstallPaths.libraryRelative, isDirectory: true)
             .appendingPathComponent("common", isDirectory: true)
         let installedFolders = Set(installed.map { $0.installDir.lowercased() })
-        for id in byID.keys where !byID[id]!.installed {
+        for id in byID.keys where byID[id]!.source == .steam && !byID[id]!.installed {
             guard let folder = byID[id]!.installDir, !folder.isEmpty,
                   !installedFolders.contains(folder.lowercased()) else {
                 byID[id]!.partial = nil
@@ -127,14 +145,20 @@ public final class Games {
         save()
     }
 
-    // MARK: From Steam
+    // MARK: From Steam and GOG
 
-    /// Asks Steam for the account's games, then their release years and the
-    /// playtime. Without a connection the list stays as it was.
+    /// Asks Steam and GOG (where signed in) for the account's games and their
+    /// facts. Without a connection the list stays as it was.
     public func refresh() async {
-        guard SteamSignIn.isSignedIn, !refreshing else { return }
+        guard !refreshing else { return }
         refreshing = true
         defer { refreshing = false }
+        if SteamSignIn.isSignedIn { await refreshSteam() }
+        if GOGAccount.shared.isSignedIn { await refreshGOG() }
+    }
+
+    /// Steam's games, then their release years and the playtime.
+    private func refreshSteam() async {
         let steam = Steam.shared
         do {
             let owned = try await steam.ownedApps()
@@ -185,10 +209,71 @@ public final class Games {
         reloadInstalled()
     }
 
-    /// Signed out: only installed games stay, which still play through Dock.
+    // MARK: From GOG
+
+    /// GOG's games, then the covers, years and sizes of those still without.
+    private func refreshGOG() async {
+        do {
+            let products = try await GOGCatalog.products(try await GOGCatalog.ownedIDs())
+            mergeOwnedGOG(products.filter(\.installableOnWindows))
+            save()
+        } catch {
+            LogStore.shared.log("[gog] owned list failed: \(GOGAccount.words(error))", level: .error)
+            return
+        }
+        // These don't change (sizes only with an update): ask for missing ones, a few at a time.
+        let missing = byID.values.filter { $0.source == .gog && ($0.gogCover == nil || $0.downloadSize == nil) }.map(\.appID)
+        await withTaskGroup(of: (Int, GOGGameFacts?, (download: Int64, install: Int64)?).self) { group in
+            var next = missing.makeIterator()
+            func add() {
+                guard let id = next.next() else { return }
+                group.addTask {
+                    async let facts = try? GOGCatalog.facts(id)
+                    async let sizes = try? GOGCatalog.sizes(id)
+                    return await (id, facts, sizes)
+                }
+            }
+            for _ in 0..<4 { add() }
+            for await (id, facts, sizes) in group {
+                if let facts {
+                    byID["gog:\(id)"]?.gogCover = facts.coverFormat
+                    if let year = facts.releaseYear { byID["gog:\(id)"]?.releaseYear = year }
+                }
+                if let sizes {
+                    byID["gog:\(id)"]?.downloadSize = sizes.download
+                    byID["gog:\(id)"]?.installSize = sizes.install
+                }
+                add()
+            }
+        }
+        save()
+    }
+
+    private func mergeOwnedGOG(_ owned: [GOGProduct]) {
+        let ownedIDs = Set(owned.map { "gog:\($0.id)" })
+        for id in byID.keys where byID[id]!.source == .gog && !ownedIDs.contains(id) {
+            if byID[id]!.installed { byID[id]!.installable = false } else { byID[id] = nil }
+        }
+        for product in owned {
+            var game = byID["gog:\(product.id)"] ?? Game(gogProductID: product.id, name: product.title)
+            game.name = product.title
+            game.installable = true
+            if game.releaseYear == nil { game.releaseYear = GOGCatalog.year(product.release_date) }
+            byID[game.id] = game
+        }
+    }
+
+    /// Signed out of GOG: only installed GOG games stay.
+    func forgetGOG() {
+        byID = byID.filter { $0.value.source != .gog || $0.value.installed }
+        for id in byID.keys where byID[id]!.source == .gog { byID[id]!.installable = false }
+        save()
+    }
+
+    /// Signed out of Steam: only installed Steam games stay, which still play through Dock.
     public func forgetAccount() {
-        byID = byID.filter { $0.value.installed }
-        for id in byID.keys {
+        byID = byID.filter { $0.value.source != .steam || $0.value.installed }
+        for id in byID.keys where byID[id]!.source == .steam {
             byID[id]!.playtimeMinutes = nil
             byID[id]!.installable = false
         }

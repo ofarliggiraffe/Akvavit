@@ -11,7 +11,10 @@ struct GetGamesView: View {
     private let games = Games.shared
     @State private var query = ""
     @State private var source = SourceFilter.all
-    @State private var signingIn = false
+    @State private var signingIn: Store?
+
+    /// Where a sign-in sheet signs in.
+    enum Store: String, Identifiable { case steam, gog; var id: Self { self } }
 
     enum SourceFilter: String, CaseIterable, Identifiable {
         case all = "All", steam = "Steam", gog = "GOG"
@@ -36,18 +39,22 @@ struct GetGamesView: View {
                 .padding(.top, 12)
             content
         }
-        .sheet(isPresented: $signingIn) {
-            // Temporary: the test screen's sign-in, until setup's is built.
-            NavigationStack { SteamTestView(showingGame: .constant(false)) }
+        .sheet(item: $signingIn) { store in
+            // Temporary: the test screens' sign-in, until setup's is built.
+            switch store {
+            case .steam: NavigationStack { SteamTestView(showingGame: .constant(false)) }
+            case .gog: NavigationStack { GOGTestView() }
+            }
         }
     }
 
     @ViewBuilder
     private var content: some View {
         let shown = filtered
-        if source != .gog, !signedIn {
-            note("Sign in to Steam to see your games. Installed games still play from the Library.") {
-                Button("Sign in to Steam") { signingIn = true }
+        if source == .gog ? !gogSignedIn : (source == .steam || !gogSignedIn) && !signedIn {
+            let store = source == .gog ? "GOG" : "Steam"
+            note("Sign in to \(store) to see your games. Installed games still play from the Library.") {
+                Button("Sign in to \(store)") { signingIn = source == .gog ? .gog : .steam }
                     .buttonStyle(FilledButtonStyle(color: Theme.getGamesColors.tint, height: 48, fontSize: 17))
                     .frame(maxWidth: 240)
             }
@@ -62,15 +69,22 @@ struct GetGamesView: View {
         if case .signedIn = Steam.shared.signIn { true } else { false }
     }
 
+    private var gogSignedIn: Bool { GOGAccount.shared.isSignedIn }
+
     private var filtered: [Game] {
-        guard source != .gog else { return [] }
         let text = query.trimmingCharacters(in: .whitespaces)
-        return games.available.filter { text.isEmpty || $0.name.localizedStandardContains(text) }
+        return games.available.filter { game in
+            let shown = switch source {
+            case .all: true
+            case .steam: game.source == .steam
+            case .gog: game.source == .gog
+            }
+            return shown && (text.isEmpty || game.name.localizedStandardContains(text))
+        }
     }
 
     private var emptyText: String {
         let text = query.trimmingCharacters(in: .whitespaces)
-        if source == .gog { return "No GOG games. GOG accounts can't be linked yet." }
         if games.refreshing && games.available.isEmpty { return "Loading your games…" }
         if !text.isEmpty { return "No game matches “\(text)”." }
         return "Every game you own is installed."

@@ -85,8 +85,8 @@ struct RootView: View {
         }
         .ignoresSafeArea(.keyboard)
         .environment(popup)
-        // Steam's view of the games: at start, and after signing in.
-        .task(id: signedIn) { await Games.shared.refresh() }
+        // Steam's and GOG's view of the games: at start, and after signing in.
+        .task(id: [signedIn, GOGAccount.shared.isSignedIn]) { await Games.shared.refresh() }
         // A session's screen, from Play or the test screens; one session per app run.
     }
 

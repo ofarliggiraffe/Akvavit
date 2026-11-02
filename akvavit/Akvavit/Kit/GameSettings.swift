@@ -101,6 +101,11 @@ extension LaunchConfig {
         case .steam:
             self.init(program: .steam(appID: game.appID), screenWidth: size.width, screenHeight: size.height,
                       reducedPrecisionX87: settings.reducedPrecisionX87)
+        case .gog:
+            // GOG games can't be installed yet (GOG step 2), so Play never
+            // reaches this; their start comes in step 3.
+            self.init(program: .desktop(), screenWidth: size.width, screenHeight: size.height,
+                      reducedPrecisionX87: settings.reducedPrecisionX87)
         }
     }
 }

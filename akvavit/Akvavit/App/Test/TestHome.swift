@@ -22,6 +22,7 @@ struct TestHome: View {
                         JITStatusRow()
                     }
                     NavigationLink("Steam") { SteamTestView(showingGame: $showingGame).clearNavigationBackground() }
+                    NavigationLink("GOG") { GOGTestView().clearNavigationBackground() }
                 }
                 TryOutSection(showingGame: $showingGame)
                 Section {

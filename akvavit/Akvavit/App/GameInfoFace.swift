@@ -196,7 +196,14 @@ private struct InstallButton: View {
         let height: CGFloat = compact ? 56 : 58
         let fontSize: CGFloat = compact ? 19 : 20
         let teal = Theme.getGamesColors.tint
-        if let download = Steam.shared.downloads[game.appID] {
+        if game.source == .gog {
+            // Temporary, until GOG downloads are built (GOG step 2).
+            Button {} label: {
+                Label("GOG downloads come next", systemImage: "arrow.down.to.line")
+            }
+            .buttonStyle(FilledButtonStyle(color: teal, height: height, fontSize: fontSize))
+            .disabled(true)
+        } else if let download = Steam.shared.downloads[game.appID] {
             if case .failed(let reason) = download.phase {
                 VStack(spacing: compact ? 10 : 12) {
                     Text(reason)

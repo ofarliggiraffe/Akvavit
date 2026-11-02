@@ -137,6 +137,31 @@ Both can be installed side by side. See "Akvavit's own app" below.
   - `ControlLayoutStore` (built-in and your control layouts, the global
     haptics switch), `ControlsRuntime` (the layout in play, its touches,
     what goes to the game), `TextBridge` (typing into the game).
+  - `GOGAccount` (sign-in, tokens); GOG's games come through `Games`
+    (`gog:<product ID>`).
+- **GOG** (2026-11-02, in steps; plan in the user's plans folder). Our own
+  code from GOG's unofficial endpoints (the ones Galaxy uses), nothing
+  copied: Madeira's draft PR #479 vendors another project's GOG client, and
+  the user chose to write our own.
+  - Sign-in: GOG's page (`auth.gog.com/auth`, Galaxy's public client ID) in
+    a web view with a non-persistent store, which stops at
+    `embed.gog.com/on_login_success` and hands over `code`;
+    `auth.gog.com/token` trades it for an hour's access token and a refresh
+    token (Keychain, this device only). Logs (`[gog]`) never carry either.
+  - Games: `embed.gog.com/user/data/games` (owned IDs, signed in), then
+    `api.gog.com/products?ids=` (50 at a time; `game_type == "game"`,
+    Windows in the content system), `gamesdb.gog.com/platforms/gog/
+    external_releases/<id>` (vertical cover: `{formatter}` =
+    `_glx_vertical_cover`, `{ext}` = `jpg`, 342×482; first release date).
+  - Builds: `content-system.gog.com/products/<id>/os/windows/builds?generation=2`
+    (no sign-in), each linking a zlib JSON manifest on GOG's CDN
+    (`content-system/v2/meta/aa/bb/<hash>`): install folder, depots
+    (languages, bitness, `isGogDepot`), dependencies. Depot manifests use the
+    same scheme: files in chunks with `md5` and `compressedMd5`, and newer
+    builds also pack small files into a container (`sfcRef`). Chunk links
+    need sign-in (`secure_link`, 401 without).
+  - Apple's Compression `.zlib` is raw deflate: skip zlib's 2-byte header
+    and 4-byte checksum.
 - **App icon** (the user's choice, option C on the icon canvas): `App/AppIcon.icon`
   (Icon Composer file: background fill with a dark override, the controller
   as a light and a dark layer, glass off), which iOS 26 and later uses, plus
