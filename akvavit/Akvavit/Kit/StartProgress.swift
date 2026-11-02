@@ -15,11 +15,15 @@
 //   licence, Steam starting the game, problems.
 // - The game: up when a visible window that has drawn something belongs to a
 //   program in the game's own folder, once the installs are done (installers
-//   can live in the game's folder too). The engine's window census says who
-//   owns each window. "Drawn": a GDI frame of its own, or for a window that
-//   Direct3D draws into, a frame the engine has actually presented (Portal's
-//   window had a swapchain well before its first frame, and Wine's desktop
-//   showed in between). A start without Steam is up at its first frame.
+//   can live in the game's folder too), and it stays: still there and drawing
+//   again a moment later (`settle`), or still there after `settleStill` for a
+//   game that draws one picture and waits. Its going away starts the wait
+//   over. The engine's window census says who owns each window. "Drawn": a
+//   GDI frame of its own, or for a window that Direct3D draws into, a frame
+//   the engine has actually presented (Portal's window had a swapchain well
+//   before its first frame, and Wine's desktop showed in between). Anno 1602
+//   drew one GDI frame, then hid its window while it set up DirectDraw: Wine's
+//   desktop showed. A start without Steam is up at its first frame.
 //
 // A window with a title bar from any other program (an installer, Steam's
 // client; not Wine's own, under C:\windows\) may need an answer: the loading
@@ -84,6 +88,8 @@ public final class StartProgress {
     @ObservationIgnored private var desktop = false
     @ObservationIgnored private var gameFolder: String?
     @ObservationIgnored private var installsRunning = false
+    /// When a game window was first seen drawn, and how much it had drawn.
+    @ObservationIgnored private var sighting: (time: Date, draws: UInt64)?
     @ObservationIgnored private var timer: Timer?
     /// The window Show it revealed: covered again when it goes.
     @ObservationIgnored private var shownWindow: UInt64?
@@ -108,7 +114,7 @@ public final class StartProgress {
         reset(before: [.jit] + (clientFiles ? [.clientFiles] : []), steam: game.source == .steam)
         self.game = game
         beforeSession = true
-        set(.jit, .now, "Turning on JIT")
+        set(.jit, .now, "Turning on")
     }
 
     /// One of Play's steps: now, done or failed.
@@ -139,6 +145,7 @@ public final class StartProgress {
         game = nil
         stopped = false
         gameFolder = nil
+        sighting = nil
         gameIsUp = false
         asking = nil
         showingWindows = false
@@ -152,9 +159,9 @@ public final class StartProgress {
         lines = truth
     }
 
-    /// A Steam start's game folder (its Windows path), and whether one-time
-    /// installs run first; `installsOnly`: they are all this session runs.
-    func dockPrepared(gameFolder: String, installs: Bool, installsOnly: Bool) {
+    /// The game's folder (its Windows path), and whether one-time installs
+    /// run first; `installsOnly`: they are all this session runs.
+    func prepared(gameFolder: String, installs: Bool, installsOnly: Bool) {
         self.gameFolder = gameFolder.lowercased().hasSuffix("\\") ? gameFolder.lowercased() : gameFolder.lowercased() + "\\"
         installsRunning = installs
         if installsOnly {
@@ -163,13 +170,15 @@ public final class StartProgress {
             steps = before + [.windows, .installs, .steam, .game]
         }
         if installs {
-            truth[.installs] = Line(status: .waiting, detail: "What this game needs from Steam")
+            truth[.installs] = Line(status: .waiting, detail: "What the game needs")
             lines[.installs] = truth[.installs]
         }
     }
 
+    /// One of Windows' own start steps: the line stays plain ("Starting");
+    /// the log has the details.
     func windowsStep(_ what: String) {
-        set(.windows, .now, what)
+        set(.windows, .now, "Starting")
     }
 
     /// Windows is running: watch for the game from here.
@@ -180,7 +189,7 @@ public final class StartProgress {
         } else if steps.contains(.steam) {
             set(.steam, .now, "Starting Steam")
         } else {
-            set(.game, .now, "Waiting for its first picture")
+            set(.game, .now, "Starting game")
         }
         if desktop { winios_window_census_enable(1) }
         timer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { _ in
@@ -239,10 +248,26 @@ public final class StartProgress {
         if desktop, gameFolder != nil {
             if steps.contains(.game), !installsRunning, truth[.steam]?.status != .failed,
                let window = windows.first(where: { isGame($0) }) {
+                // Everything the game's windows have drawn so far.
+                let draws = windows.filter { isGame($0) }.reduce(UInt64(Session.shared.framesPresented)) { $0 + UInt64($1.presents) }
+                guard let seen = sighting else {
+                    sighting = (Date(), draws)
+                    LogStore.shared.log("[start] game window seen \(window.program) \(window.width)x\(window.height) "
+                                        + "gdi-frames=\(window.presents) direct3d=\(window.metal ? 1 : 0)")
+                    return applyVisibility()
+                }
+                let waited = Date().timeIntervalSince(seen.time)
+                guard (waited >= Self.settle && draws > seen.draws) || waited >= Self.settleStill else {
+                    return applyVisibility()
+                }
                 LogStore.shared.log("[start] game window \(window.program) \(window.width)x\(window.height) "
                                     + "gdi-frames=\(window.presents) direct3d=\(window.metal ? 1 : 0) "
-                                    + "frames=\(Session.shared.framesPresented)")
+                                    + "frames=\(Session.shared.framesPresented) after \(String(format: "%.1f", waited)) s")
                 return gameUp()
+            } else if sighting != nil {
+                // The game's window went (a game switching its screen mode): wait again.
+                sighting = nil
+                LogStore.shared.log("[start] game window gone again")
             }
             findAsking(windows)
         } else if Session.shared.framesPresented > 0 || (desktop && winios_surface_present_count() > 0) {
@@ -254,7 +279,7 @@ public final class StartProgress {
     /// The last tick shows for a moment, so the whole list is seen done; then
     /// the loading screen goes and the game shows.
     private func gameUp() {
-        set(.game, .done, "Up")
+        set(.game, .done, "Ready")
         asking = nil
         showingWindows = false
         stop()
@@ -274,6 +299,10 @@ public final class StartProgress {
 
     /// How long the finished list shows before the game.
     private static let doneMoment: TimeInterval = 0.9
+    /// How long a game window must stay and draw again before the game is up.
+    private static let settle: TimeInterval = 1.0
+    /// How long a game window that doesn't draw again must stay.
+    private static let settleStill: TimeInterval = 4.0
 
     /// Windows' screen (the game's picture, and on a desktop Wine's desktop) is
     /// hidden while the loading screen covers it. Done on every tick: the
@@ -294,11 +323,11 @@ public final class StartProgress {
         let results = DockInstallScripts.results(String(decoding: data, as: UTF8.self))
         if let running = results.running {
             let name = results.started[running].map { $0.isEmpty ? "A program" : $0 } ?? "A program"
-            set(.installs, .now, "\(name) · \(running) of \(max(results.total, running))")
+            set(.installs, .now, "Installing \(name) · \(running) of \(max(results.total, running))")
         } else if results.ended {
             installsRunning = false
             let failed = results.exits.values.filter { !DockInstallScripts.Results.succeeded($0) }.count
-            set(.installs, .done, failed == 0 ? "Done" : "\(failed) of \(max(results.total, results.exits.count)) did not finish")
+            set(.installs, .done, failed == 0 ? "Done" : "Done, \(failed) of \(max(results.total, results.exits.count)) didn't finish")
             if steps.contains(.steam), truth[.steam]?.status == .waiting { set(.steam, .now, "Starting Steam") }
         }
     }
@@ -312,18 +341,18 @@ public final class StartProgress {
         }
         let fields = report.fields
         if fields["launch-client-error"] == "0" {
-            set(.steam, .done, "The game is starting")
-            set(.game, .now, "Waiting for its window")
+            set(.steam, .done, "Done")
+            set(.game, .now, "Starting game")
         } else if fields["launch-update-wait"] != nil, fields["launch-update-ready"] == nil {
-            set(.steam, .now, "Steam is updating the game")
+            set(.steam, .now, "Updating the game")
         } else if ["ceg-scm", "ceg-request-busy", "ceg-request"].contains(where: { fields[$0] != nil }), fields["ceg-result"] == nil {
-            set(.steam, .now, "Steam is preparing the game")
+            set(.steam, .now, "Preparing the game")
         } else if fields["session-requested-app-listed"] == "1" || fields["session-offline-listed"] == "1" {
-            set(.steam, .now, "Licence confirmed")
+            set(.steam, .now, "Signed in")
         } else if fields["session-authenticated-online"] == "1" {
-            set(.steam, .now, "Signed in, checking the licence")
+            set(.steam, .now, "Signing in")
         } else if fields["session-offline-requested"] != nil {
-            set(.steam, .now, "Offline: using what Steam saved")
+            set(.steam, .now, "Starting offline")
         } else if fields["session-native-token-submitted"] != nil || fields["session-logon-start-result"] != nil {
             set(.steam, .now, "Signing in")
         }
@@ -379,7 +408,10 @@ public final class StartProgress {
         }
         guard asking?.window != candidate.id else { return }
         if installsRunning {
-            let name = truth[.installs]?.detail.components(separatedBy: " · ").first ?? "An installer"
+            let detail = truth[.installs]?.detail ?? ""
+            let name = detail.hasPrefix("Installing ")
+                ? String(detail.dropFirst("Installing ".count).prefix { $0 != "·" }).trimmingCharacters(in: .whitespaces)
+                : "An installer"
             asking = Asking(title: "An installer is asking something",
                             detail: "\(name), one of Steam’s one-time installs for this game, has a window open that may need an answer.",
                             window: candidate.id)
@@ -435,12 +467,12 @@ public final class StartProgress {
 
     private static func waitingWords(_ step: Step) -> String {
         switch step {
-        case .jit: "Turning on JIT"
+        case .jit: "Turning on"
         case .clientFiles: "Downloading, once"
         case .windows: "Getting ready"
-        case .installs: "What this game needs from Steam"
-        case .steam: "Signs in and starts the game"
-        case .game: "Waiting for its window"
+        case .installs: "What the game needs"
+        case .steam: "Signing in"
+        case .game: "Starting game"
         }
     }
 }

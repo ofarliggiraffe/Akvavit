@@ -169,6 +169,12 @@ Both can be installed side by side. See "Akvavit's own app" below.
     Games go to `drive_c/GOG Games/<installDirectory>`, our records to
     `drive_c/GOG Games/.akvavit/<id>.json` (+ `.files.json`, and
     `.partial.json` for a stopped download, which Install resumes).
+  - Starting (`Kit/GOGStart.swift`): no client, no Dock. The game's own
+    `goggame-<id>.info` (primary `FileTask`: path, arguments, working
+    folder) gives the program; Play writes `drive_c/GOG Games/.akvavit/
+    start-<id>.cmd` (UTF-8 with `chcp 65001`, `cd /d`, then `start "" /d`),
+    and a desktop session runs it through `cmd.exe /c`. `LaunchConfig.gameFolder`
+    tells the loading screen which programs are the game's.
   - One download queue for every store: `Kit/Downloads.swift` (by game ID),
     which `DownloadActivity` reports. A game start stops all downloads.
   - Store logos (covers, the popup's chip): Wikimedia Commons' public-domain
@@ -293,6 +299,11 @@ Both can be installed side by side. See "Akvavit's own app" below.
   the Play tap, not a `fullScreenCover` (that came up only once the session
   had started), and `GameLayerHost` starts hidden (its black covered the
   loading screen).
+  The game must stay: its window still there and drawing again 1 s after
+  it was first seen (or still there after 4 s if it drew one picture and
+  waits); its going away starts the wait over. Anno 1602 drew one GDI frame,
+  then hid its window while setting up DirectDraw, and Wine's desktop showed.
+  Lines are plain words for players ("Starting game"); details go to the log.
   The app's drawing stalls while JIT turns on and while Windows prepares
   its JIT memory (likely the debugger pausing the process; not measured):
   the spinner is a Core Animation layer (the render server turns it), and
@@ -572,6 +583,14 @@ through Dock at 60 FPS, RT2, Portal).
   A game's Controller choice "XInput and DirectInput" doesn't work through
   Dock: it's exported at Play, but Windows programs inherit their environment
   from Steam, which started earlier. DirectInput reads it from there.
+- **Fixed-address file mappings in 32-bit programs** (2026-11-02): wow64
+  moves the program's address into its guest window before
+  `NtMapViewOfSection` (`build/ntdll-unix/virtual_ios.c`), which then checked
+  the moved address against the guest's `zero_bits` limit and refused it
+  (`STATUS_INVALID_PARAMETER_4`, error 87). Wine's DirectPlay (`dplayx`) maps
+  its shared memory at 0x50000000 and falls back only on "invalid address",
+  so its `DllMain` failed and Anno 1602 (GOG) exited at start (c0000142).
+  Our change checks and limits the guest address inside the window.
 - **Steam's shared redistributables** (Age of Empires II HD and DE):
   - Games can take depots from "Steamworks Common Redistributables" (228980:
     Visual C++ and DirectX installers, `depotfromapp` + `sharedinstall`).

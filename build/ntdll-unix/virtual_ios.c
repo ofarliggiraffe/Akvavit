@@ -34316,14 +34316,26 @@ NTSTATUS WINAPI NtMapViewOfSection( HANDLE handle, HANDLE process, PVOID *addr_p
     TRACE("handle=%p process=%p addr=%p off=%s size=0x%lx alloc_type=0x%x access=0x%x\n",
           handle, process, *addr_ptr, wine_dbgstr_longlong(offset.QuadPart), *size_ptr, alloc_type, protect );
 
+    /* Akvavit: a 32-bit program's address arrives already moved into its
+     * guest window (wow64 adds the window's base), while zero_bits still
+     * describes the guest's address space. So the address is checked, and
+     * later limited, as the guest sees it. Wine's DirectPlay maps its shared
+     * memory at 0x50000000: this check refused it (STATUS_INVALID_PARAMETER_4)
+     * where Windows would map it or say "conflicting addresses", so
+     * DirectPlay's fallback never ran and Anno 1602 exited at start. */
+    ULONG_PTR wow_base = process == NtCurrentProcess() ? ios_wow_base() : 0;
+    UINT_PTR guest_addr = (UINT_PTR)*addr_ptr;
+    if (wow_base && guest_addr >= wow_base && guest_addr - wow_base < 0x100000000ULL) guest_addr -= wow_base;
+    else wow_base = 0;
+
     /* Check parameters */
     if (zero_bits > 21 && zero_bits < 32)
         return STATUS_INVALID_PARAMETER_4;
 
     /* If both addr_ptr and zero_bits are passed, they have match */
-    if (zero_bits && zero_bits < 32 && ((UINT_PTR)*addr_ptr >> (32 - zero_bits)))
+    if (zero_bits && zero_bits < 32 && (guest_addr >> (32 - zero_bits)))
         return STATUS_INVALID_PARAMETER_4;
-    if (zero_bits >= 32 && ((UINT_PTR)*addr_ptr & ~zero_bits))
+    if (zero_bits >= 32 && (guest_addr & ~zero_bits))
         return STATUS_INVALID_PARAMETER_4;
 
     if (!is_win64 && !is_wow64())
@@ -34372,8 +34384,13 @@ NTSTATUS WINAPI NtMapViewOfSection( HANDLE handle, HANDLE process, PVOID *addr_p
         return result.map_view.status;
     }
 
-    return virtual_map_section( handle, addr_ptr, 0, get_zero_bits_limit( zero_bits ), commit_size,
-                                offset_ptr, size_ptr, alloc_type, protect, 0 );
+    {
+        ULONG_PTR limit = get_zero_bits_limit( zero_bits );
+        /* Akvavit: the guest's limit, inside its window (see above). */
+        if (wow_base && limit) limit += wow_base;
+        return virtual_map_section( handle, addr_ptr, 0, limit, commit_size,
+                                    offset_ptr, size_ptr, alloc_type, protect, 0 );
+    }
 }
 
 /***********************************************************************

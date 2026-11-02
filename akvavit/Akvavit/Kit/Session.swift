@@ -32,10 +32,15 @@ public struct LaunchConfig: Sendable {
     public var reducedPrecisionX87: Bool
     /// More variables, set last (so they win). For trying engine options.
     public var extraEnvironment: [String: String]
+    /// The game's folder (a Windows path) for a desktop start that isn't
+    /// Steam's: the game is up when a window of a program in it has drawn.
+    public var gameFolder: String?
 
     public init(program: Program, screenWidth: Int = 1024, screenHeight: Int = 768,
-                reducedPrecisionX87: Bool = false, extraEnvironment: [String: String] = [:]) {
+                reducedPrecisionX87: Bool = false, extraEnvironment: [String: String] = [:],
+                gameFolder: String? = nil) {
         self.program = program
+        self.gameFolder = gameFolder
         self.screenWidth = screenWidth
         self.screenHeight = screenHeight
         self.reducedPrecisionX87 = reducedPrecisionX87
@@ -49,6 +54,7 @@ public struct LaunchConfig: Sendable {
     }
 
     public var displayName: String {
+        if let gameFolder, let name = gameFolder.split(separator: "\\").last { return String(name) }
         switch program {
         case .direct(let executable, _, _):
             return executable.split(whereSeparator: { $0 == "\\" || $0 == "/" }).last.map(String.init) ?? executable
@@ -120,6 +126,9 @@ public final class Session {
                             + "x87-reduced=\(config.reducedPrecisionX87 ? 1 : 0)")
 
         guard case .steam(let appID, let arguments) = config.program else {
+            if let folder = config.gameFolder, config.isDesktop {
+                StartProgress.shared.prepared(gameFolder: folder, installs: false, installsOnly: false)
+            }
             launch(config, environment: Self.environment(for: config))
             return
         }
@@ -129,7 +138,7 @@ public final class Session {
                 let dock = try await DockStart.prepare(appID: appID, arguments: arguments,
                                                        width: config.screenWidth, height: config.screenHeight)
                 installsOnly = dock.installsOnly
-                StartProgress.shared.dockPrepared(gameFolder: dock.gameFolder, installs: dock.installs,
+                StartProgress.shared.prepared(gameFolder: dock.gameFolder, installs: dock.installs,
                                                   installsOnly: dock.installsOnly)
                 var environment = Self.environment(for: config)
                 environment.merge(dock.environment) { _, dock in dock }

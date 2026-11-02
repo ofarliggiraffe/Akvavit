@@ -102,10 +102,11 @@ extension LaunchConfig {
             self.init(program: .steam(appID: game.appID), screenWidth: size.width, screenHeight: size.height,
                       reducedPrecisionX87: settings.reducedPrecisionX87)
         case .gog:
-            // Not reached yet: Play stops GOG games until their start is
-            // built (GOG step 3).
-            self.init(program: .desktop(), screenWidth: size.width, screenHeight: size.height,
-                      reducedPrecisionX87: settings.reducedPrecisionX87)
+            // Windows' desktop runs the start file GOGStart.prepare wrote.
+            self.init(program: .desktop(executable: GOGStart.command(game.appID)),
+                      screenWidth: size.width, screenHeight: size.height,
+                      reducedPrecisionX87: settings.reducedPrecisionX87,
+                      gameFolder: GOGInstalls.record(game.appID).map(GOGStart.windowsFolder))
         }
     }
 }

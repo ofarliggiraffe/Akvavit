@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // What Play does before the game starts: JIT on, Valve's client files in
-// place, then the session with the game's settings. The loading screen shows
+// place (Steam games) or the start file written (GOG games), then the session
+// with the game's settings. The loading screen shows
 // from the start and lists these steps first (StartProgress); what stops Play
 // shows there, and on the popup.
 
@@ -29,14 +30,11 @@ final class PlayStart {
     func play(_ game: Game) async {
         guard !busy, blocked == nil else { return }
         problem = nil
-        // Temporary, until GOG starts are built (GOG step 3).
-        guard game.source != .gog else {
-            problem = "Starting GOG games comes in the next step."
-            return
-        }
         defer { step = nil }
         let progress = StartProgress.shared
-        progress.prepare(game, clientFiles: !Steam.shared.clientReady)
+        // Steam games start through Valve's client (its files once); GOG games start directly.
+        let steam = game.source == .steam
+        progress.prepare(game, clientFiles: steam && !Steam.shared.clientReady)
         // The loading screen is drawn first (cover, name, steps); then the
         // work starts, some of which keeps the app busy for a moment.
         try? await Task.sleep(for: .milliseconds(350))
@@ -51,7 +49,7 @@ final class PlayStart {
             }
         }
         progress.report(.jit, .done, "On")
-        if !Steam.shared.clientReady {
+        if steam, !Steam.shared.clientReady {
             step = "Getting Steam's client files (once)…"
             progress.report(.clientFiles, .now, "Downloading, once")
             do {
@@ -62,6 +60,15 @@ final class PlayStart {
                 return
             }
             progress.report(.clientFiles, .done, "Ready")
+        }
+        if game.source == .gog {
+            do {
+                try GOGStart.prepare(game.appID)
+            } catch {
+                problem = error.localizedDescription
+                progress.report(.windows, .failed, problem ?? "")
+                return
+            }
         }
         let settings = GameSettingsStore.shared[game.id]
         Session.shared.start(LaunchConfig(game: game, settings: settings, fitting: Self.fittingSize()))

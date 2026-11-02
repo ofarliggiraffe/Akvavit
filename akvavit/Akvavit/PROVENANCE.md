@@ -22,6 +22,7 @@ Written for Akvavit. Where a file stands in for something of Madeira's, it says 
 | `Kit/Games.swift` | One game list for the interface: installed games from the install records (offline; through Madeira's `MadeiraDock.games` and `SteamInstallFiles.sizeOnDisk`), the account's games from Steam and GOG, a disk cache. |
 | `Kit/Downloads.swift` | One download queue for every store (moved out of `Kit/Steam.swift`): each download's state, cancel, uninstall, the background task's progress. |
 | `Kit/GOGDownloader.swift`, `Kit/GOGInstalls.swift` | GOG downloads (chunks through GOG's signed links, checked by md5, written at their offsets, resumable) and GOG games on disk (records, uninstall). |
+| `Kit/GOGStart.swift` | Starting a GOG game: the program from the game's own `goggame-<id>.info`, a start file that Windows' desktop runs. |
 | `Kit/GOGAccount.swift`, `Kit/GOGCatalog.swift` | GOG: sign-in (GOG's page, then its token exchange; tokens in the Keychain), the account's games, product facts, covers, builds and their manifests. Written from GOG's endpoints as probed and the community's API notes; nothing copied from any GOG tool (Madeira has none). |
 | `Kit/GameSettings.swift` | Each game's settings (x87, screen size, controls), kept in one file, and the start they make (`LaunchConfig`). |
 | `Kit/Setup.swift` | Setup's state (done once, run again) and its JIT chain: pairing, the VPN, the check, each starting the next. |
