@@ -33,12 +33,9 @@ struct CoverArt: View {
             .clipped()
             .overlay(alignment: .bottomTrailing) {
                 if showsBadge {
-                    Text("STEAM")
-                        .font(.quicksand(10, .bold, relativeTo: .caption2))
-                        .tracking(0.6)
+                    StoreLogo(source: game.source, size: 16)
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
+                        .padding(4)
                         .background(Color(hex: 0x0C0E1E, alpha: 0.72), in: .rect(cornerRadius: 7))
                         .padding(8)
                 }
@@ -98,7 +95,7 @@ struct CoverCell: View {
             CoverArt(game: game, titleSize: compact ? 12 : 15)
                 .aspectRatio(2 / 3, contentMode: .fit)
                 .overlay(alignment: .top) {
-                    if let download = Steam.shared.downloads[game.appID] {
+                    if let download = Downloads.shared[game.id] {
                         DownloadMark(download: download)
                     } else if game.partiallyDownloaded {
                         CoverLabel(text: "Paused")
@@ -121,10 +118,26 @@ struct CoverCell: View {
     }
 }
 
+/// The store's logo, one colour (its foreground style), with the store's
+/// name for VoiceOver. Both logos are public domain on Wikimedia Commons
+/// (trademarks of Valve and GOG), used only to say where a game comes from.
+struct StoreLogo: View {
+    let source: Game.Source
+    let size: CGFloat
+
+    var body: some View {
+        Image(source == .steam ? "StoreSteam" : "StoreGOG")
+            .resizable()
+            .scaledToFit()
+            .frame(width: size, height: size)
+            .accessibilityLabel(source.displayName)
+    }
+}
+
 /// A download's state on its cover: a progress bar, "Waiting", or a red mark
 /// when it failed (its popup says why).
 private struct DownloadMark: View {
-    let download: SteamDownload
+    let download: GameDownload
 
     var body: some View {
         switch download.phase {

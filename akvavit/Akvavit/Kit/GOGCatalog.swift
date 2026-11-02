@@ -134,6 +134,40 @@ enum GOGCatalog {
         }
     }
 
+    /// A file or folder of a depot. Paths use Windows' backslashes.
+    struct DepotItem: Decodable {
+        struct Chunk: Decodable {
+            let md5: String
+            let size: Int64
+            let compressedMd5: String
+            let compressedSize: Int64
+        }
+        let type: String
+        let path: String
+        let chunks: [Chunk]?
+    }
+
+    /// A depot's files and folders, from its manifest.
+    static func depotItems(_ manifest: String) async throws -> [DepotItem] {
+        struct Reply: Decodable {
+            struct Depot: Decodable { let items: [DepotItem] }
+            let depot: Depot
+        }
+        let data = try inflated(try await get(metaURL(manifest)))
+        return try JSONDecoder().decode(Reply.self, from: data).depot.items
+    }
+
+    /// A manifest's place on GOG's CDN: meta/aa/bb/<hash>.
+    static func metaURL(_ hash: String) throws -> URL {
+        guard hash.count > 4, hash.allSatisfy(\.isHexDigit) else { throw GOGAccount.Failure.unreadable }
+        return URL(string: "https://gog-cdn-fastly.gog.com/content-system/v2/meta/" + storePath(hash))!
+    }
+
+    /// aa/bb/<hash>, how GOG files manifests and chunks.
+    static func storePath(_ hash: String) -> String {
+        "\(hash.prefix(2))/\(hash.dropFirst(2).prefix(2))/\(hash)"
+    }
+
     /// About how much the newest build downloads and takes on disk.
     static func sizes(_ id: Int) async throws -> (download: Int64, install: Int64)? {
         guard let build = try await builds(id).first else { return nil }

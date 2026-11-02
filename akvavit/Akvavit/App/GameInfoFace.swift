@@ -40,7 +40,7 @@ struct GameInfoFace: View {
                 HStack(alignment: .top, spacing: 12) {
                     VStack(alignment: .leading, spacing: 10) {
                         title(size: small ? 22 : 28)
-                        SourceChip()
+                        SourceChip(source: game.source)
                     }
                     .padding(.top, 4)
                     Spacer(minLength: 0)
@@ -65,7 +65,7 @@ struct GameInfoFace: View {
                         CloseButton { model.close() }
                     }
                     title(size: 22)
-                    SourceChip()
+                    SourceChip(source: game.source)
                 }
             }
             FactsRow(game: game, compact: true)
@@ -196,14 +196,7 @@ private struct InstallButton: View {
         let height: CGFloat = compact ? 56 : 58
         let fontSize: CGFloat = compact ? 19 : 20
         let teal = Theme.getGamesColors.tint
-        if game.source == .gog {
-            // Temporary, until GOG downloads are built (GOG step 2).
-            Button {} label: {
-                Label("GOG downloads come next", systemImage: "arrow.down.to.line")
-            }
-            .buttonStyle(FilledButtonStyle(color: teal, height: height, fontSize: fontSize))
-            .disabled(true)
-        } else if let download = Steam.shared.downloads[game.appID] {
+        if let download = Downloads.shared[game.id] {
             if case .failed(let reason) = download.phase {
                 VStack(spacing: compact ? 10 : 12) {
                     Text(reason)
@@ -213,7 +206,7 @@ private struct InstallButton: View {
                         .fixedSize(horizontal: false, vertical: true)
                     HStack(spacing: 10) {
                         Button {
-                            Steam.shared.install(game.appID)
+                            Downloads.shared.install(game.id)
                         } label: {
                             Label("Try again", systemImage: "arrow.clockwise")
                         }
@@ -239,7 +232,7 @@ private struct InstallButton: View {
         } else if game.partiallyDownloaded {
             HStack(spacing: 10) {
                 Button {
-                    Steam.shared.install(game.appID)
+                    Downloads.shared.install(game.id)
                 } label: {
                     Label("Resume download", systemImage: "arrow.down.to.line")
                 }
@@ -248,7 +241,7 @@ private struct InstallButton: View {
             }
         } else {
             Button {
-                Steam.shared.install(game.appID)
+                Downloads.shared.install(game.id)
             } label: {
                 Label("Install", systemImage: "arrow.down.to.line")
             }
@@ -270,7 +263,7 @@ private struct InstallButton: View {
     }
 
     /// Speed and amount, under the bar: "12.3 MB/s · 1.2 of 22 GB".
-    static func detail(_ download: SteamDownload) -> String {
+    static func detail(_ download: GameDownload) -> String {
         guard download.phase == .downloading, !download.sharedFiles, download.totalBytes > 0 else { return " " }
         var parts: [String] = []
         if download.bytesPerSecond > 0 {
@@ -280,7 +273,7 @@ private struct InstallButton: View {
         return parts.joined(separator: " · ")
     }
 
-    static func label(_ download: SteamDownload) -> String {
+    static func label(_ download: GameDownload) -> String {
         if download.sharedFiles, download.phase != .waiting { return "Checking Steam's shared files…" }
         return switch download.phase {
         case .waiting: "Waiting for another download"
@@ -326,13 +319,20 @@ private struct ProgressBar: View {
 }
 
 private struct SourceChip: View {
+    let source: Game.Source
+
     var body: some View {
-        Text("Steam")
-            .font(.quicksand(13, .bold, relativeTo: .caption))
-            .foregroundStyle(Theme.chipText)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(Theme.chip, in: .capsule)
+        Label {
+            Text(source.displayName)
+        } icon: {
+            StoreLogo(source: source, size: 14).accessibilityHidden(true)
+        }
+        .labelStyle(.titleAndIcon)
+        .font(.quicksand(13, .bold, relativeTo: .caption))
+        .foregroundStyle(Theme.chipText)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(Theme.chip, in: .capsule)
     }
 }
 

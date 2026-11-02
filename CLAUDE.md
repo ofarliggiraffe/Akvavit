@@ -162,6 +162,17 @@ Both can be installed side by side. See "Akvavit's own app" below.
     need sign-in (`secure_link`, 401 without).
   - Apple's Compression `.zlib` is raw deflate: skip zlib's 2-byte header
     and 4-byte checksum.
+  - Downloads (`Kit/GOGDownloader.swift`): `secure_link?generation=2&path=/&_version=2`
+    per product gives `urls[0]` (`url_format` with `{…}` parameters); a
+    chunk is `{path}` + `/aa/bb/<compressedMd5>`. Each chunk is checked by
+    compressed and plain md5 and written at its offset, four at once.
+    Games go to `drive_c/GOG Games/<installDirectory>`, our records to
+    `drive_c/GOG Games/.akvavit/<id>.json` (+ `.files.json`, and
+    `.partial.json` for a stopped download, which Install resumes).
+  - One download queue for every store: `Kit/Downloads.swift` (by game ID),
+    which `DownloadActivity` reports. A game start stops all downloads.
+  - Store logos (covers, the popup's chip): Wikimedia Commons' public-domain
+    Steam and GOG logos, made one-colour, as template images.
 - **App icon** (the user's choice, option C on the icon canvas): `App/AppIcon.icon`
   (Icon Composer file: background fill with a dark override, the controller
   as a light and a dark layer, glass off), which iOS 26 and later uses, plus

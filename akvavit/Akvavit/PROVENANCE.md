@@ -18,8 +18,10 @@ Written for Akvavit. Where a file stands in for something of Madeira's, it says 
 | `App/AkvavitApp.swift` | The app's entry point (with the app delegate for the orientation lock). |
 | `App/RootView.swift`, `App/TabColumn.swift`, `App/Theme.swift`, `App/LibraryView.swift`, `App/GetGamesView.swift`, `App/GameGrid.swift`, `App/CoverView.swift`, `App/GamePopup.swift`, `App/GameInfoFace.swift`, `App/GameSettingsFace.swift`, `App/Play.swift`, `App/SetupView.swift` | The interface, as the user designed it (the mockup canvas): tab column, theme, Library and Get games, the game popup with its flip and settings side, what Play does before a game starts (JIT, Valve's client files), and setup (welcome, JIT, Steam sign-in, done). |
 | `App/Test/*` | **Temporary test screens**, only for checking AkvavitKit on the device. The real interface replaces all of them. |
-| `Kit/Steam.swift` | Sign-in (on SwiftSteam's sign-in model), the account's games, downloads, uninstall, Valve's client files. **For now it uses Madeira's `MadeiraDock.games` (installed games), `SteamRuntimeInstaller` (Valve's client files), and for uninstall `SteamInstallFiles.delete` and Dock's install ledger.** |
+| `Kit/Steam.swift` | Sign-in (on SwiftSteam's sign-in model), the account's games, its download work (the queue is `Downloads`), uninstall, Valve's client files. **For now it uses Madeira's `MadeiraDock.games` (installed games), `SteamRuntimeInstaller` (Valve's client files), and for uninstall `SteamInstallFiles.delete` and Dock's install ledger.** |
 | `Kit/Games.swift` | One game list for the interface: installed games from the install records (offline; through Madeira's `MadeiraDock.games` and `SteamInstallFiles.sizeOnDisk`), the account's games from Steam and GOG, a disk cache. |
+| `Kit/Downloads.swift` | One download queue for every store (moved out of `Kit/Steam.swift`): each download's state, cancel, uninstall, the background task's progress. |
+| `Kit/GOGDownloader.swift`, `Kit/GOGInstalls.swift` | GOG downloads (chunks through GOG's signed links, checked by md5, written at their offsets, resumable) and GOG games on disk (records, uninstall). |
 | `Kit/GOGAccount.swift`, `Kit/GOGCatalog.swift` | GOG: sign-in (GOG's page, then its token exchange; tokens in the Keychain), the account's games, product facts, covers, builds and their manifests. Written from GOG's endpoints as probed and the community's API notes; nothing copied from any GOG tool (Madeira has none). |
 | `Kit/GameSettings.swift` | Each game's settings (x87, screen size, controls), kept in one file, and the start they make (`LaunchConfig`). |
 | `Kit/Setup.swift` | Setup's state (done once, run again) and its JIT chain: pairing, the VPN, the check, each starting the next. |
@@ -58,6 +60,7 @@ Written for Akvavit. Where a file stands in for something of Madeira's, it says 
 |---|---|
 | `App/Fonts/Quicksand-Variable.ttf` | The Quicksand font, unchanged (Google Fonts' `ofl/quicksand/Quicksand[wght].ttf`, renamed). SIL Open Font License 1.1, Reserved Font Name "Quicksand". |
 | `App/Fonts/Quicksand-OFL.txt` | Its licence. |
+| `App/Assets.xcassets/StoreSteam.imageset/steam.svg`, `App/Assets.xcassets/StoreGOG.imageset/gog.svg` | The Steam and GOG logos, from Wikimedia Commons (`File:Steam icon logo.svg`, `File:GOG.com logo.svg`), public domain there (too simple for copyright) but trademarks of Valve and GOG; used only to show which store a game is from. Made one-colour for the app: Steam's disc with the piston cut out, GOG's square mark without the wordmark under it. |
 
 ## Madeira's components (kept; may be replaced later)
 

@@ -11,7 +11,17 @@ import Foundation
 import Observation
 
 public struct Game: Identifiable, Hashable, Sendable, Codable {
-    public enum Source: String, Sendable, Codable { case steam, gog }
+    public enum Source: String, Sendable, Codable {
+        case steam, gog
+
+        /// The store's name, as people know it.
+        public var displayName: String {
+            switch self {
+            case .steam: "Steam"
+            case .gog: "GOG"
+            }
+        }
+    }
 
     /// "steam:<app ID>" or "gog:<product ID>".
     public let id: String
@@ -142,7 +152,28 @@ public final class Games {
             }
             byID[id]!.partial = FileManager.default.fileExists(atPath: common.appendingPathComponent(folder).path)
         }
+        reloadInstalledGOG()
         save()
+    }
+
+    /// GOG's install records: what is installed, and stopped downloads.
+    private func reloadInstalledGOG() {
+        let records = GOGInstalls.installed()
+        let installedIDs = Set(records.map { "gog:\($0.productID)" })
+        for id in byID.keys where byID[id]!.source == .gog && byID[id]!.installed && !installedIDs.contains(id) {
+            byID[id]!.installed = false
+            byID[id]!.sizeOnDisk = nil
+        }
+        for record in records {
+            var game = byID["gog:\(record.productID)"] ?? Game(gogProductID: record.productID, name: record.name)
+            game.installed = true
+            game.partial = nil
+            game.sizeOnDisk = record.size
+            byID[game.id] = game
+        }
+        for id in byID.keys where byID[id]!.source == .gog && !byID[id]!.installed {
+            byID[id]!.partial = GOGInstalls.hasJournal(byID[id]!.appID)
+        }
     }
 
     // MARK: From Steam and GOG

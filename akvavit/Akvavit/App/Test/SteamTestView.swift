@@ -106,15 +106,15 @@ struct SteamTestView: View {
                 Spacer()
                 Text("\(game.id)").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
             }
-            if let download = steam.downloads[game.id] {
+            if let download = Downloads.shared["steam:\(game.id)"] {
                 switch download.phase {
                 case .failed(let why):
                     Text(why).foregroundStyle(.red).font(.caption)
-                    Button("Try again") { steam.install(game.id) }
+                    Button("Try again") { Downloads.shared.install("steam:\(game.id)") }
                 default:
                     ProgressView(value: download.fraction)
                     Text(describe(download)).font(.caption).foregroundStyle(.secondary)
-                    Button("Stop") { steam.cancelDownload(game.id) }
+                    Button("Stop") { Downloads.shared.cancelDownload("steam:\(game.id)") }
                 }
             } else if game.installed {
                 HStack {
@@ -124,7 +124,7 @@ struct SteamTestView: View {
                         .disabled(!jit.isOn || session.needsRestart || !steam.clientReady)
                 }
             } else {
-                Button("Install") { steam.install(game.id) }
+                Button("Install") { Downloads.shared.install("steam:\(game.id)") }
             }
         }
         .buttonStyle(.borderless)
@@ -137,7 +137,7 @@ struct SteamTestView: View {
         showingGame = true
     }
 
-    private func describe(_ d: SteamDownload) -> String {
+    private func describe(_ d: GameDownload) -> String {
         let mb = { (b: UInt64) in String(format: "%.0f MB", Double(b) / 1_048_576) }
         switch d.phase {
         case .waiting: return "Waiting"

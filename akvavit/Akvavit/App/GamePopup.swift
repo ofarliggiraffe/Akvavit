@@ -180,8 +180,8 @@ final class GamePopupModel {
         confirmError = nil
         do {
             switch confirming {
-            case .uninstall: try await Steam.shared.uninstall(game.appID)
-            case .cancelDownload: try await Steam.shared.cancelInstall(game.appID)
+            case .uninstall: try await Downloads.shared.uninstall(game.id)
+            case .cancelDownload: try await Downloads.shared.cancelInstall(game.id)
             }
             confirmedWorking = false
             self.confirming = nil

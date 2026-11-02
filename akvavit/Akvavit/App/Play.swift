@@ -29,6 +29,11 @@ final class PlayStart {
     func play(_ game: Game) async {
         guard !busy, blocked == nil else { return }
         problem = nil
+        // Temporary, until GOG starts are built (GOG step 3).
+        guard game.source != .gog else {
+            problem = "Starting GOG games comes in the next step."
+            return
+        }
         defer { step = nil }
         let progress = StartProgress.shared
         progress.prepare(game, clientFiles: !Steam.shared.clientReady)

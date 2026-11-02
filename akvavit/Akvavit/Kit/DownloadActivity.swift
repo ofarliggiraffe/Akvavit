@@ -22,7 +22,7 @@ final class DownloadActivity {
     private var subtitle = "Starting"
     private var fraction = 0.0
     /// The download the progress belongs to: within one, it never goes back.
-    private var job: Int?
+    private var job: String?
     /// What iOS was last told, so only changes are sent.
     private var shownTitle: String?
     private var shownSubtitle: String?
@@ -64,7 +64,7 @@ final class DownloadActivity {
         task = backgroundTask
         backgroundTask.progress.totalUnitCount = 100
         // The downloads may have ended before iOS started the task.
-        guard Steam.shared.hasQueuedDownloads else {
+        guard Downloads.shared.hasQueued else {
             end(success: true)
             return
         }
@@ -73,7 +73,7 @@ final class DownloadActivity {
         backgroundTask.expirationHandler = {
             Task { @MainActor in
                 SteamLog.event("[akvavit-steam] background download: stopped by iOS or in the Live Activity")
-                Steam.shared.stopAllDownloads()
+                Downloads.shared.stopAll()
                 DownloadActivity.shared.end(success: false)
             }
         }
@@ -83,7 +83,7 @@ final class DownloadActivity {
     /// The first download in line (`job`): its name, step and progress.
     /// iOS ends tasks whose progress looks stuck, so it only grows within
     /// one download.
-    func update(job: Int, title: String, subtitle: String, fraction: Double) {
+    func update(job: String, title: String, subtitle: String, fraction: Double) {
         if job != self.job {
             self.job = job
             self.fraction = 0
