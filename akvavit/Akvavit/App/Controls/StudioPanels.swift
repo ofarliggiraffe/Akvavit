@@ -663,6 +663,34 @@ struct DeleteLayoutCard: View {
     let cancel: () -> Void
 
     var body: some View {
+        ConfirmLayoutCard(title: "Delete \u{201C}\(name)\u{201D}?",
+                          text: "Games that use it go back to \(BuiltInLayouts.gameDefault.name).",
+                          action: "Delete", confirm: delete, cancel: cancel)
+    }
+}
+
+/// Asks before a changed built-in layout goes back as the app has it.
+struct RestoreLayoutCard: View {
+    let name: String
+    let restore: () -> Void
+    let cancel: () -> Void
+
+    var body: some View {
+        ConfirmLayoutCard(title: "Restore \u{201C}\(name)\u{201D}?",
+                          text: "Your changes to it are undone, and it is back as Akvavit has it.",
+                          action: "Restore", confirm: restore, cancel: cancel)
+    }
+}
+
+/// The card that asks before a layout is deleted or restored.
+private struct ConfirmLayoutCard: View {
+    let title: String
+    let text: String
+    let action: String
+    let confirm: () -> Void
+    let cancel: () -> Void
+
+    var body: some View {
         ZStack {
             Theme.cardDim
                 .ignoresSafeArea()
@@ -670,13 +698,13 @@ struct DeleteLayoutCard: View {
                 .onTapGesture(perform: cancel)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 10) {
-                Text("Delete \u{201C}\(name)\u{201D}?")
+                Text(title)
                     .font(.quicksand(20, .bold, relativeTo: .title3))
-                Text("Games that use it go back to Touch as mouse.")
+                Text(text)
                 HStack(spacing: 10) {
                     Button("Cancel", action: cancel)
                         .buttonStyle(OutlineButtonStyle(fontSize: 16, height: 46))
-                    Button("Delete", action: delete)
+                    Button(action, action: confirm)
                         .buttonStyle(FilledButtonStyle(color: Theme.destructiveFill, height: 46, fontSize: 16))
                 }
                 .padding(.top, 8)

@@ -256,6 +256,8 @@ targets:
         group: Akvavit (shared with Madeira's app)
       - path: ../App/AkvavitInstallScripts.swift
         group: Akvavit (shared with Madeira's app)
+      - path: ../App/AkvavitInstallScriptExtras.swift
+        group: Akvavit (shared with Madeira's app)
       - path: ../App/AkvavitSessionLogs.swift
         group: Akvavit (shared with Madeira's app)
       - path: ../App/AkvavitVCRuntime.swift

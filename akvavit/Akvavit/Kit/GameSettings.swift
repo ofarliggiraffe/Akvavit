@@ -34,17 +34,26 @@ public struct GameSettings: Codable, Equatable, Sendable {
         }
     }
 
-    public enum Controls: String, Codable, CaseIterable, Sendable {
-        case touchAsMouse
-
-        public var label: String { "Touch as mouse" }
-    }
-
     public var reducedPrecisionX87 = true
     public var screenSize = ScreenSize.fit
-    public var controls = Controls.touchAsMouse
+    /// The control layout over the game (`ControlLayout.id`); nil:
+    /// `BuiltInLayouts.gameDefault`, as for a layout deleted since.
+    public var controlLayout: String?
+    /// Frames per second and how busy the processor and graphics are, in
+    /// the top-left corner during play.
+    public var performanceBar = false
 
     public init() {}
+
+    // Settings saved before a field existed keep their other values.
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        let defaults = GameSettings()
+        reducedPrecisionX87 = try values.decodeIfPresent(Bool.self, forKey: .reducedPrecisionX87) ?? defaults.reducedPrecisionX87
+        screenSize = (try? values.decodeIfPresent(ScreenSize.self, forKey: .screenSize)) ?? defaults.screenSize
+        controlLayout = try? values.decodeIfPresent(String.self, forKey: .controlLayout)
+        performanceBar = try values.decodeIfPresent(Bool.self, forKey: .performanceBar) ?? defaults.performanceBar
+    }
 }
 
 @MainActor @Observable

@@ -21,7 +21,7 @@ final class ControlsOverlay {
     /// Shows the controls over the game (the chosen layout).
     func show() {
         let runtime = ControlsRuntime.shared
-        if runtime.layout == nil { runtime.use(TestLayoutChoice.layout) }
+        if runtime.layout == nil { runtime.use(GameLayoutChoice.layout) }
         let controller = controller ?? ControlsOverlayController()
         self.controller = controller
         GameOverlay.show(controller, touches: controller.controlTouches)
@@ -44,6 +44,7 @@ final class ControlsOverlayController: UIViewController {
     private let input = ControlsInputView()
     private let loading = UIHostingController(rootView: OverlayLoading())
     private let canvas = UIHostingController(rootView: OverlayControls())
+    private let performance = UIHostingController(rootView: PerformanceBar())
     private var menu: UIHostingController<TestGameMenu>?
 
     /// Only touches that begin on a control (on the loading screen's button
@@ -65,6 +66,10 @@ final class ControlsOverlayController: UIViewController {
         canvas.view.backgroundColor = .clear
         canvas.view.isUserInteractionEnabled = false
         embed(canvas)
+        // Information only: above the controls, never touched.
+        performance.view.backgroundColor = .clear
+        performance.view.isUserInteractionEnabled = false
+        embed(performance)
         input.frame = view.bounds
         input.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         view.addSubview(input)
@@ -138,19 +143,23 @@ private struct OverlayControls: View {
     }
 }
 
-/// TEMPORARY: the layout over games, chosen in the test menu, until a game's
-/// settings choose its layout.
+/// The layout over a game: the one its Game settings choose (the default
+/// layout, as you may have changed it, when none or when that layout was
+/// deleted). A start from the test screens has no game: Touch as mouse. The
+/// test menu's choice is saved as the game's too.
 @MainActor
-enum TestLayoutChoice {
-    private static let key = "akvavit.testLayout"
-
+enum GameLayoutChoice {
     static var layout: ControlLayout {
-        UserDefaults.standard.string(forKey: key).flatMap { ControlLayoutStore.shared.layout(id: $0) }
-            ?? BuiltInLayouts.touchAsMouse
+        let store = ControlLayoutStore.shared
+        guard let game = StartProgress.shared.game else { return store.layout(id: BuiltInLayouts.touchAsMouse.id)! }
+        return GameSettingsStore.shared[game.id].controlLayout.flatMap { store.layout(id: $0) }
+            ?? store.layout(id: BuiltInLayouts.gameDefault.id)!
     }
 
     static func choose(_ layout: ControlLayout) {
-        UserDefaults.standard.set(layout.id, forKey: key)
+        if let game = StartProgress.shared.game {
+            GameSettingsStore.shared[game.id].controlLayout = layout.id == BuiltInLayouts.gameDefault.id ? nil : layout.id
+        }
         ControlsRuntime.shared.use(layout)
     }
 }

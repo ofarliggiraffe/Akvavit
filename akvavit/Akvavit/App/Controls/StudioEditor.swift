@@ -78,6 +78,10 @@ struct StudioEditor: View {
                 path.move(to: CGPoint(x: area.minX, y: y))
                 path.addLine(to: CGPoint(x: area.maxX, y: y))
             }
+            for line in model.diagonals {
+                path.move(to: CGPoint(x: area.minX, y: line.slope * area.minX + line.offset))
+                path.addLine(to: CGPoint(x: area.maxX, y: line.slope * area.maxX + line.offset))
+            }
         }
         .stroke(StudioMarks.glow, style: StrokeStyle(lineWidth: 2, dash: [6, 5]))
         .allowsHitTesting(false)

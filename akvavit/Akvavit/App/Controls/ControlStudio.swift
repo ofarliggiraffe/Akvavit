@@ -2,14 +2,15 @@
 //
 // The controls studio (the canvas's "Controls studio" boards): a layout on the
 // whole display, at the size its controls have over a game, in landscape.
-// Floating on it: back and the layout's name at the top left, and for your
-// own layouts a "…" with the layout's settings (touch on the game, haptics,
-// delete). A built-in layout can't change; the bar at the bottom makes a copy,
-// which opens here at once with its name ready to type over. Your layouts
-// have the tool bar there instead: snap to grid and its spacing, and Mirror
-// (on narrow displays a shorter bar, as the phone board shows). Both bars sit along the top, out of the way of the
-// controls, which mostly go at the bottom (the user's choice). While a finger
-// is on a control, the bars all but disappear.
+// Floating on it: back and the layout's name at the top left, and a "…" with
+// the layout's settings (touch on the game, haptics; Make a copy, which opens
+// here at once with its name ready to type over; for your layouts Delete, for
+// a changed built-in one Restore defaults). Built-in layouts are edited like
+// yours (the user, 2026-11-02), but keep their names. The tool bar at the top
+// right: snap to grid and its spacing, and Mirror (on narrow displays a
+// shorter bar, as the phone board shows). The bars sit along the top, out of
+// the way of the controls, which mostly go at the bottom (the user's choice).
+// While a finger is on a control, the bars all but disappear.
 
 import AkvavitKit
 import SwiftUI
@@ -32,6 +33,7 @@ struct ControlStudio: View {
     @FocusState private var naming: Bool
     @State private var showingMenu = false
     @State private var confirmingDelete = false
+    @State private var confirmingRestore = false
     @State private var model = StudioModel()
     /// "Add a control" is open.
     @State private var adding = false
@@ -58,12 +60,8 @@ struct ControlStudio: View {
             ZStack(alignment: .topLeading) {
                 StudioBackground(spacing: model.snaps ? model.spacing : nil)
                 if let layout {
-                    if layout.isBuiltIn {
-                        ControlsCanvas(layout: layout, area: area)
-                    } else {
-                        StudioEditor(layout: layout, area: area, model: model, save: store.update)
-                        panel(layout, area: area)
-                    }
+                    StudioEditor(layout: layout, area: area, model: model, save: store.update)
+                    panel(layout, area: area)
                 }
             }
         }
@@ -76,7 +74,7 @@ struct ControlStudio: View {
             HStack(alignment: .top, spacing: 12) {
                 floating(topBar)
                 Spacer(minLength: 0)
-                if let layout { floating(layout.isBuiltIn ? AnyView(builtInBar) : AnyView(toolBar)) }
+                if layout != nil { floating(toolBar) }
             }
             .padding(.horizontal, compact ? 16 : 24)
             .padding(.top, compact ? 14 : 18)
@@ -88,6 +86,14 @@ struct ControlStudio: View {
                     close()
                 } cancel: {
                     withAnimation(.easeOut(duration: 0.2)) { confirmingDelete = false }
+                }
+            } else if confirmingRestore {
+                RestoreLayoutCard(name: layout?.name ?? "") {
+                    model.selected = nil
+                    store.restore(layoutID)
+                    withAnimation(.easeOut(duration: 0.2)) { confirmingRestore = false }
+                } cancel: {
+                    withAnimation(.easeOut(duration: 0.2)) { confirmingRestore = false }
                 }
             } else if adding {
                 AddControlCard(add: add) { adding = false }
@@ -196,63 +202,51 @@ struct ControlStudio: View {
                     .textInputAutocapitalization(.sentences)
                     .autocorrectionDisabled()
                     .modifier(NamePill(compact: compact))
-                Button { showingMenu = true } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(Theme.outlineText)
-                        .frame(width: round, height: round)
-                        .background(StudioColors.floating, in: .circle)
-                }
-                .accessibilityLabel("Layout settings")
-                .popover(isPresented: $showingMenu) {
-                    if let layout {
-                        LayoutMenu(layout: layout) {
-                            showingMenu = false
-                            withAnimation(.easeOut(duration: 0.2)) { confirmingDelete = true }
-                        }
-                        .presentationCompactAdaptation(.popover)
-                    }
-                }
             } else {
                 Text(layout?.name ?? "")
                     .lineLimit(1)
                     .modifier(NamePill(compact: compact))
             }
+            Button { showingMenu = true } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(Theme.outlineText)
+                    .frame(width: round, height: round)
+                    .background(StudioColors.floating, in: .circle)
+            }
+            .accessibilityLabel("Layout settings")
+            .popover(isPresented: $showingMenu) {
+                if let layout {
+                    LayoutMenu(layout: layout, makeCopy: {
+                        showingMenu = false
+                        makeCopy()
+                    }, restore: {
+                        showingMenu = false
+                        withAnimation(.easeOut(duration: 0.2)) { confirmingRestore = true }
+                    }, delete: {
+                        showingMenu = false
+                        withAnimation(.easeOut(duration: 0.2)) { confirmingDelete = true }
+                    })
+                    .presentationCompactAdaptation(.popover)
+                }
+            }
         }
         .shadow(color: .black.opacity(0.3), radius: 8, y: 6)
     }
 
-    private var builtInBar: some View {
-        HStack(spacing: 12) {
-            Text("Built in, can't be changed")
-                .font(.quicksand(13, .bold, relativeTo: .footnote))
-                .foregroundStyle(Theme.outlineText)
-                .padding(.leading, 12)
-            Button("Make a copy", action: makeCopy)
-                .font(.quicksand(14, .bold, relativeTo: .subheadline))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 14)
-                .frame(height: 38)
-                .background(Theme.controlsColors.tint, in: .capsule)
-        }
-        .padding(compact ? 4 : 7)
-        .background(StudioColors.floating, in: .capsule)
-        .shadow(color: .black.opacity(0.35), radius: 12, y: 10)
-    }
-
     // MARK: Actions
 
-    // Changing controls (your layouts only; each change is saved at once).
+    // Changing controls (each change is saved at once).
 
     private func change(_ id: UUID, _ edit: (inout Control) -> Void) {
-        guard var layout, !layout.isBuiltIn, let index = layout.controls.firstIndex(where: { $0.id == id }) else { return }
+        guard var layout, let index = layout.controls.firstIndex(where: { $0.id == id }) else { return }
         edit(&layout.controls[index])
         store.update(layout)
     }
 
     /// New controls in the middle of the display, the (last) one selected.
     private func insert(_ controls: [Control]) {
-        guard var layout, !layout.isBuiltIn, !controls.isEmpty else { return }
+        guard var layout, !controls.isEmpty else { return }
         layout.controls += controls
         store.update(layout)
         model.selected = controls.last?.id
@@ -302,14 +296,14 @@ struct ControlStudio: View {
     }
 
     private func delete(_ id: UUID) {
-        guard var layout, !layout.isBuiltIn else { return }
+        guard var layout else { return }
         layout.controls.removeAll { $0.id == id }
         store.update(layout)
         model.selected = nil
     }
 
     private func mirror() {
-        guard let layout, !layout.isBuiltIn else { return }
+        guard let layout else { return }
         store.update(StudioModel.mirrored(layout))
     }
 
@@ -354,6 +348,8 @@ private struct NamePill: ViewModifier {
 /// The whole layout's settings, from "…".
 private struct LayoutMenu: View {
     let layout: ControlLayout
+    let makeCopy: () -> Void
+    let restore: () -> Void
     let delete: () -> Void
     private let store = ControlLayoutStore.shared
 
@@ -376,8 +372,15 @@ private struct LayoutMenu: View {
                     .foregroundStyle(StudioColors.ink)
             }
             .tint(Theme.controlsColors.tint)
-            Button("Delete layout", action: delete)
-                .buttonStyle(OutlineButtonStyle(fontSize: 14, height: 42, destructive: true))
+            Button("Make a copy", action: makeCopy)
+                .buttonStyle(OutlineButtonStyle(fontSize: 14, height: 42))
+            if !layout.isBuiltIn {
+                Button("Delete layout", action: delete)
+                    .buttonStyle(OutlineButtonStyle(fontSize: 14, height: 42, destructive: true))
+            } else if store.isChanged(layout.id) {
+                Button("Restore defaults", action: restore)
+                    .buttonStyle(OutlineButtonStyle(fontSize: 14, height: 42, destructive: true))
+            }
         }
         .padding(18)
         .frame(width: 260)

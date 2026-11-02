@@ -13,6 +13,17 @@ struct GameSettingsFace: View {
     let size: CGSize
     let model: GamePopupModel
     @Bindable private var store = GameSettingsStore.shared
+    private static let fade: CGFloat = 32
+    private let layouts = ControlLayoutStore.shared
+
+    /// The game's layout; one deleted since reads as the default.
+    private var layoutChoice: Binding<String> {
+        Binding(get: {
+            store[game.id].controlLayout.flatMap { layouts.layout(id: $0)?.id } ?? BuiltInLayouts.gameDefault.id
+        }, set: { id in
+            store[game.id].controlLayout = id == BuiltInLayouts.gameDefault.id ? nil : id
+        })
+    }
 
     var body: some View {
         // Full spacing only on the inner display in landscape.
@@ -38,38 +49,72 @@ struct GameSettingsFace: View {
                     .buttonStyle(.plain)
             }
 
-            if game.installed {
-                RepairRow(game: game)
+            // The rows scroll when they don't fit (the outer display); the
+            // title and Done stay. A soft fade at the bottom shows there is
+            // more; the last row can scroll clear of it.
+            ScrollView {
+                VStack(alignment: .leading, spacing: wide ? 18 : 10) {
+                    rows
+                }
+                .padding(.bottom, Self.fade)
             }
-            SettingRow("Reduced-precision x87",
-                       detail: "Much faster Direct3D 8 games. Off computes floating point exactly, slowly.") {
-                Toggle("Reduced-precision x87", isOn: $store[game.id].reducedPrecisionX87)
-                    .labelsHidden()
-                    .tint(Theme.accent)
-            }
-            SettingRow("Screen size", detail: "The size of the Windows screen the game runs on.") {
-                Menu {
-                    Picker("Screen size", selection: $store[game.id].screenSize) {
-                        ForEach(GameSettings.ScreenSize.allCases, id: \.self) { Text($0.label) }
-                    }
-                } label: {
-                    MenuLabel(store[game.id].screenSize.label)
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollIndicators(.hidden)
+            .mask {
+                VStack(spacing: 0) {
+                    Color.black
+                    LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom)
+                        .frame(height: Self.fade)
                 }
             }
-            SettingRow("Controls", detail: "How touch reaches the game.") {
-                Menu {
-                    Picker("Controls", selection: $store[game.id].controls) {
-                        ForEach(GameSettings.Controls.allCases, id: \.self) { Text($0.label) }
-                    }
-                } label: {
-                    MenuLabel(store[game.id].controls.label)
-                }
-            }
-            Spacer(minLength: 0)
         }
         .foregroundStyle(Theme.cardText)
         .padding(.horizontal, wide ? 32 : 20)
         .padding(.vertical, wide ? 28 : 20)
+    }
+
+    @ViewBuilder
+    private var rows: some View {
+        SettingRow("Controls", detail: "The on-screen controls over the game. Make and change layouts in the Controls tab.") {
+            Menu {
+                Picker("Controls", selection: layoutChoice) {
+                    Section("Built in") {
+                        ForEach(layouts.builtIns) { Text($0.name).tag($0.id) }
+                    }
+                    if !layouts.yours.isEmpty {
+                        Section("Yours") {
+                            ForEach(layouts.yours) { Text($0.name).tag($0.id) }
+                        }
+                    }
+                }
+            } label: {
+                MenuLabel(layouts.layout(id: layoutChoice.wrappedValue)?.name ?? BuiltInLayouts.gameDefault.name)
+            }
+        }
+        SettingRow("Screen size", detail: "The size of the Windows screen the game runs on.") {
+            Menu {
+                Picker("Screen size", selection: $store[game.id].screenSize) {
+                    ForEach(GameSettings.ScreenSize.allCases, id: \.self) { Text($0.label) }
+                }
+            } label: {
+                MenuLabel(store[game.id].screenSize.label)
+            }
+        }
+        if game.installed {
+            RepairRow(game: game)
+        }
+        SettingRow("Performance bar",
+                   detail: "Frames per second and how busy the processor and graphics are, in the top-left corner.") {
+            Toggle("Performance bar", isOn: $store[game.id].performanceBar)
+                .labelsHidden()
+                .tint(Theme.accent)
+        }
+        SettingRow("Reduced-precision x87",
+                   detail: "Much faster Direct3D 8 games. Off computes floating point exactly, slowly.") {
+            Toggle("Reduced-precision x87", isOn: $store[game.id].reducedPrecisionX87)
+                .labelsHidden()
+                .tint(Theme.accent)
+        }
     }
 }
 
@@ -160,6 +205,7 @@ private struct MenuLabel: View {
     var body: some View {
         HStack(spacing: 8) {
             Text(text)
+                .lineLimit(1)
             if chevron {
                 Image(systemName: "chevron.down")
                     .font(.system(size: 13, weight: .bold))

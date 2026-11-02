@@ -199,6 +199,7 @@
 		B318619A5ECFFEFDD17BBCF4 /* AkvavitInstallScripts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 264F41746EB750E4FEDA1D40 /* AkvavitInstallScripts.swift */; };
 		C3FBD56EC444A6D720287434 /* AkvavitVCRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DD70F788ED7D72BCD1F679C /* AkvavitVCRuntime.swift */; };
 		90258B46E59F0BDDFB343A17 /* AkvavitSessionLogs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D4B5FEFFCB1838C0D7BF5B0 /* AkvavitSessionLogs.swift */; };
+		E9F6A505D6B90BB469B1523A /* AkvavitInstallScriptExtras.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D8E808459E0EAEBF69D4035 /* AkvavitInstallScriptExtras.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -455,6 +456,7 @@
 		264F41746EB750E4FEDA1D40 /* AkvavitInstallScripts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "AkvavitInstallScripts.swift"; path = "../akvavit/App/AkvavitInstallScripts.swift"; sourceTree = SOURCE_ROOT; };
 		8DD70F788ED7D72BCD1F679C /* AkvavitVCRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "AkvavitVCRuntime.swift"; path = "../akvavit/App/AkvavitVCRuntime.swift"; sourceTree = SOURCE_ROOT; };
 		7D4B5FEFFCB1838C0D7BF5B0 /* AkvavitSessionLogs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "AkvavitSessionLogs.swift"; path = "../akvavit/App/AkvavitSessionLogs.swift"; sourceTree = SOURCE_ROOT; };
+		1D8E808459E0EAEBF69D4035 /* AkvavitInstallScriptExtras.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "AkvavitInstallScriptExtras.swift"; path = "../akvavit/App/AkvavitInstallScriptExtras.swift"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -756,6 +758,7 @@
 		7115A7D2CFB920A7816DDCA2 /* Akvavit */ = {
 			isa = PBXGroup;
 			children = (
+				1D8E808459E0EAEBF69D4035 /* AkvavitInstallScriptExtras.swift */,
 				7D4B5FEFFCB1838C0D7BF5B0 /* AkvavitSessionLogs.swift */,
 				8DD70F788ED7D72BCD1F679C /* AkvavitVCRuntime.swift */,
 				264F41746EB750E4FEDA1D40 /* AkvavitInstallScripts.swift */,
@@ -956,6 +959,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E9F6A505D6B90BB469B1523A /* AkvavitInstallScriptExtras.swift in Sources */,
 				90258B46E59F0BDDFB343A17 /* AkvavitSessionLogs.swift in Sources */,
 				C3FBD56EC444A6D720287434 /* AkvavitVCRuntime.swift in Sources */,
 				B318619A5ECFFEFDD17BBCF4 /* AkvavitInstallScripts.swift in Sources */,

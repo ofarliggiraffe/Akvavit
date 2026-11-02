@@ -27,6 +27,9 @@ final class StudioModel {
     private(set) var resizing = false
     /// Lines the live control's edges or middles are on, across the display.
     private(set) var guides: (x: [CGFloat], y: [CGFloat]) = ([], [])
+    /// 45° lines its centre is on, through other controls' centres, across the
+    /// display: y = slope · x + offset, slope 1 or -1.
+    private(set) var diagonals: [(slope: CGFloat, offset: CGFloat)] = []
 
     var snaps = UserDefaults.standard.object(forKey: "akvavit.studio.snap") as? Bool ?? true {
         didSet { UserDefaults.standard.set(snaps, forKey: "akvavit.studio.snap") }
@@ -66,8 +69,68 @@ final class StudioModel {
                               others.flatMap { [$0.minX, $0.midX, $0.maxX] }, &lines.x)
         frame.origin.y = snap(frame.minY, frame.height, area.minY, area.maxY,
                               others.flatMap { [$0.minY, $0.midY, $0.maxY] }, &lines.y)
-        live = (id, Self.inside(frame, area))
+        // 45° lines through the other controls' centres pull the same way,
+        // keeping an edge or middle already lined up on its axis.
+        let centres = others.map { CGPoint(x: $0.midX, y: $0.midY) }
+        if !snaps, let pull = Self.diagonalPull(frame, centres, keepX: !lines.x.isEmpty, keepY: !lines.y.isEmpty) {
+            frame = Self.inside(frame.offsetBy(dx: pull.width, dy: pull.height), area)
+            lines = (Self.lined(frame.minX, frame.width, area, others.flatMap { [$0.minX, $0.midX, $0.maxX] }, horizontal: true),
+                     Self.lined(frame.minY, frame.height, area, others.flatMap { [$0.minY, $0.midY, $0.maxY] }, horizontal: false))
+        }
+        frame = Self.inside(frame, area)
+        live = (id, frame)
         guides = lines
+        diagonals = Self.diagonals(through: CGPoint(x: frame.midX, y: frame.midY), centres)
+    }
+
+    /// The smallest move (within the pull) that puts the centre of `frame` on
+    /// a 45° line through one of `centres`; along one axis only when the
+    /// other is kept.
+    private static func diagonalPull(_ frame: CGRect, _ centres: [CGPoint], keepX: Bool, keepY: Bool) -> CGSize? {
+        guard !(keepX && keepY) else { return nil }
+        let centre = CGPoint(x: frame.midX, y: frame.midY)
+        var best: CGSize?
+        for other in centres {
+            for slope in [CGFloat(1), -1] {
+                // How far the centre is above or below the line, vertically.
+                let off = (centre.y - other.y) - slope * (centre.x - other.x)
+                guard abs(off) >= 0.5 else { continue }
+                let move: CGSize = keepX ? CGSize(width: 0, height: -off)
+                    : keepY ? CGSize(width: slope * off, height: 0)
+                    : CGSize(width: slope * off / 2, height: -off / 2)
+                guard hypot(move.width, move.height) <= lineSnap else { continue }
+                if best == nil || hypot(move.width, move.height) < hypot(best!.width, best!.height) { best = move }
+            }
+        }
+        return best
+    }
+
+    /// The 45° lines through `centres` that `centre` is on.
+    private static func diagonals(through centre: CGPoint, _ centres: [CGPoint]) -> [(slope: CGFloat, offset: CGFloat)] {
+        var found: [(slope: CGFloat, offset: CGFloat)] = []
+        for other in centres {
+            for slope in [CGFloat(1), -1] where abs((centre.y - other.y) - slope * (centre.x - other.x)) < 0.5 {
+                let offset = other.y - slope * other.x
+                if !found.contains(where: { $0.slope == slope && abs($0.offset - offset) < 0.5 }) {
+                    found.append((slope, offset))
+                }
+            }
+        }
+        return found
+    }
+
+    /// The lines (others' edges and middles, and the display's middle) that
+    /// an edge or the middle of a control at `origin` is on.
+    private static func lined(_ origin: CGFloat, _ size: CGFloat, _ area: CGRect, _ others: [CGFloat],
+                              horizontal: Bool) -> [CGFloat] {
+        let middle = horizontal ? area.midX : area.midY
+        var lines: [CGFloat] = []
+        for edge in [origin, origin + size / 2, origin + size] {
+            for line in others + [middle] where abs(line - edge) < 0.5 && !lines.contains(line) {
+                lines.append(line)
+            }
+        }
+        return lines
     }
 
     /// One axis: the control's start edge after snapping.
@@ -140,6 +203,7 @@ final class StudioModel {
                            width: width, height: height)
         live = (control.id, Self.inside(frame, area))
         guides = ([], [])
+        diagonals = []
     }
 
     private static func keepsShape(_ control: Control) -> Bool {
@@ -174,6 +238,7 @@ final class StudioModel {
         live = nil
         resizing = false
         guides = ([], [])
+        diagonals = []
     }
 
     /// Every control on the other side.

@@ -17,8 +17,8 @@ struct GameSurface: UIViewRepresentable {
     func updateUIView(_ view: GameSurfaceView, context: Context) {}
 }
 
-/// TEMPORARY in-game test menu, shown over the controls above the game. It
-/// also chooses the controls' layout until games choose theirs.
+/// TEMPORARY in-game test menu, shown over the controls above the game. Its
+/// layout choice is saved as the game's (Game settings choose it too).
 struct TestGameMenu: View {
     let close: () -> Void
     private let store = ControlLayoutStore.shared
@@ -29,7 +29,7 @@ struct TestGameMenu: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Controls").font(.headline)
                 ForEach(store.all) { layout in
-                    Button { TestLayoutChoice.choose(layout) } label: {
+                    Button { GameLayoutChoice.choose(layout) } label: {
                         HStack {
                             Text(layout.name)
                             Spacer()

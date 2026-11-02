@@ -130,7 +130,8 @@ Both can be installed side by side. See "Akvavit's own app" below.
     records, offline, cached in Application Support; owned games, release
     years and playtime from Steam), `Covers` (Steam's CDN, disk cache,
     downsampled);
-  - `GameSettingsStore` (per game: x87 on by default, screen size, controls);
+  - `GameSettingsStore` (per game, in the user's order: control layout,
+    screen size, Check and repair, performance bar, x87 on by default);
   - `SetupFlow` (first-start setup, its JIT chain);
   - `GameSurfaceView` (picture and touch as mouse);
   - `GameOverlay` (interface above the picture);
@@ -345,6 +346,14 @@ Both can be installed side by side. See "Akvavit's own app" below.
   its JIT memory (likely the debugger pausing the process; not measured):
   the spinner is a Core Animation layer (the render server turns it), and
   the shown lines are paced 0.3 s apart so ticks arrive one by one.
+- **"The JIT memory could not be prepared"** (seen 2026-11-02, 2 of 38 kept
+  runs, back to back): Madeira's constructor (`JITAllocator.c`,
+  `madeira_early_va_claim`) holds the 0x140000000 executable window before
+  `main`, but a malloc region (VM tag 1 or 2) was already inside it, from
+  initialisers that run earlier. Then `allocatePool` finds no valid place
+  (`ml1034: could NOT reserve`, `ml1097: occupant`, `BAD POOL`). Chance,
+  per app run; the next run worked. The loading screen's Close Akvavit is
+  the way out. Watch how often it happens before doing anything.
 - **Logs:** `Documents/madeira-log.txt` copies empty while a game runs, but
   the hard links in `Documents/logs/` copy fine. Our lines are tagged
   `[session]` (with `fps` every 10 s), `[touch]`, `[controls]` and
@@ -362,17 +371,16 @@ Both can be installed side by side. See "Akvavit's own app" below.
     the user measured it as about the same;
   - fold/unfold, and the test menu with Quit.
 - **Open:**
-  - **Priority: keep the app out of iCloud backups** (the user, 2026-11-01).
-    Backups grew huge: the Wine prefix, with every Steam game inside it,
-    is in `Documents` and was backed up. iOS has no switch to exclude a
-    whole app, so the app marks its own folders (`Documents` and
-    `Library/Application Support`, all of each) excluded from backup
-    (`isExcludedFromBackup`). The mark is lost when a folder is created
-    again, so set it at each start and again after anything that adds or
-    removes data: downloads, installs and uninstalls, Repair, a new
-    prefix, Wine Mono, logs. For anyone who installs the app, not only
-    this device. Not excludable: UserDefaults (`Library/Preferences`, tiny)
-    and the Keychain. Caches and tmp are never backed up anyway.
+  - **Backups** (2026-11-02, `Kit/Backup.swift`; verified: Akvavit's backup
+    is 2.2 MB): the
+    user chose settings in, everything else out. `Library/Application
+    Support` (layouts, game settings, the games list) and `Library/Preferences`
+    are backed up; every item in `Documents` (the Wine prefix with all games
+    *and saves*, logs, `fex-jit-dump.bin`, `.Trash`) is marked
+    `isExcludedFromBackup` at each start and on `didEnterBackground` (a
+    folder loses the mark when made anew). Saves are left out on purpose:
+    old games keep them anywhere, no rule could find them. Caches are never
+    backed up; the Keychain sign-ins are this-device-only.
   - Quit should end the game and return to the app rather than close it
     (wait for Wine to stop, then show the app; a second game still needs a
     restart). Madeira can't quit a game either. It belongs with the real
@@ -380,8 +388,6 @@ Both can be installed side by side. See "Akvavit's own app" below.
   - Launch options other than Steam's first.
   - Per-game settings files.
   - Background downloads.
-  - Choosing a game's control layout in its settings (not designed yet;
-    the four-finger test menu chooses one meanwhile).
 
 ## Updating Madeira
 
@@ -420,8 +426,8 @@ through Dock at 60 FPS, RT2, Portal).
   The Controls tab and studio are designed and built (2026-11-01).
   Everything in `App/Test/` is temporary test screens for checking AkvavitKit;
   the Settings tab holds them until Settings is designed. Not designed yet:
-  Settings' contents, the in-game menu (controls, Quit), choosing a game's
-  layout in its settings, dark-mode colours (placeholders in
+  Settings' contents, the in-game menu (controls, Quit), dark-mode colours
+  (placeholders in
   `App/Theme.swift`).
 - **FEX changes are the user's call** (an earlier note here called FEX
   untouchable; the user never set that rule). Upstream FEX-Emu doesn't accept
@@ -617,6 +623,8 @@ through Dock at 60 FPS, RT2, Portal).
   slot 1-3 starts it.) Portal's joystick goes through SDL2, so look there
   next (SDL's XInput detection, or Steam Input taking the device). Try a
   second XInput game (Portal 2) before blaming the transport.
+  2026-11-02: Skyrim (72850, through Dock) reads our on-screen controller's
+  sticks (the user), so the transport works; Portal's problem is Portal's.
   A game's Controller choice "XInput and DirectInput" doesn't work through
   Dock: it's exported at Play, but Windows programs inherit their environment
   from Steam, which started earlier. DirectInput reads it from there.
@@ -641,6 +649,14 @@ through Dock at 60 FPS, RT2, Portal).
     only `.exe`/`.msi`; Steam's Visual C++ 2015-2022 scripts run `.cmd`
     wrappers (`AkvavitInstallScripts.swift`; exit 1638, "newer installed",
     counts as done).
+  - Madeira carried out only a script's "Run Process" part. Its "Registry"
+    values and "Copy Folders" (Steam's Windows service does both on a PC)
+    are done before each Dock start by `AkvavitInstallScriptExtras.swift`
+    (`[akvavit-script]`; values in both registry views, only missing files
+    copied; `%INSTALLDIR%`, `%ROOTDRIVE%`, `%USER_MYDOCS%` from user.reg's
+    Shell Folders "Personal"). Found 2026-11-02 with Skyrim (72850): its
+    launcher offered INSTALL instead of PLAY without HKLM\SOFTWARE\Bethesda
+    Softworks\Skyrim "Installed Path".
   - Microsoft's Visual C++ 14 installer engine hangs in Akvavit (2015 and
     2022 did; Madeira met it with Red Dead Redemption 2), and DirectX setup
     can't work (its 64-bit `infinst.exe` must load at 0x100000000, where iOS

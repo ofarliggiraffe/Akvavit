@@ -883,6 +883,7 @@ enum DockInstallers {
         // the registry.
         applyRequest(game, found: found, prefix: prefix, drive: drive, others: others)
         AkvavitInstallScripts.recordSupplied(found, prefix: prefix)   // Akvavit: Visual C++ 14 the app supplies
+        AkvavitInstallScriptExtras.apply(game, drive: drive, prefix: prefix)   // Akvavit: the scripts' Registry and Copy Folders
         guard !found.isEmpty else {
             LogStore.shared.log("[dock-installers] app=\(app) scripts=\(scripts) programs=0"); return
         }

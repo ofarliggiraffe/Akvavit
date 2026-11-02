@@ -24,5 +24,7 @@ public enum AkvavitEngine {
         // Dock's Reset takes the Visual C++ markers from the bundled prefix template.
         DockReset.baselineProvider = { DockReset.templateRegistry { madeira_extract_prefix_tgz($0, $1) } }
         JITNetworkShortcut.shared.restoreLeftover()
+        // Documents (Windows, games, logs) stays out of the phone's backups.
+        Backup.begin()
     }
 }
