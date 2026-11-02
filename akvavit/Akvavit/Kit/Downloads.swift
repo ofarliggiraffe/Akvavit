@@ -64,16 +64,19 @@ public final class Downloads {
         }
     }
 
-    /// Checks every file of an installed GOG game, fetches the damaged or
-    /// missing ones, and brings it to GOG's newest build.
+    /// Checks every file of an installed game, fetches the damaged or
+    /// missing ones, and brings it to the store's newest build. Steam's
+    /// downloader checks every file of an installed game anyway.
     public func repair(_ gameID: String) {
-        guard tasks[gameID] == nil, gameID.hasPrefix("gog:") else { return }
-        checking.insert(gameID)
+        guard tasks[gameID] == nil else { return }
+        if gameID.hasPrefix("gog:") { checking.insert(gameID) }
         install(gameID)
     }
 
     /// Stops a download. What is downloaded stays; installing again resumes.
+    /// A failed one is forgotten.
     public func cancelDownload(_ gameID: String) {
+        if tasks[gameID] == nil { state[gameID] = nil }
         tasks[gameID]?.cancel()
     }
 

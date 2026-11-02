@@ -54,13 +54,18 @@ public struct Game: Identifiable, Hashable, Sendable, Codable {
     var headerImage: String?
     /// GOG's vertical cover, an address with `{formatter}` and `{ext}` in it.
     var gogCover: String?
-    /// GOG's newest build, and the installed one (installed GOG games).
-    var gogLatestBuild: String?
-    var gogInstalledBuild: String?
-    /// GOG has a newer version of this installed game.
+    /// The store's newest build, and the installed one (installed games).
+    var latestBuild: String?
+    var installedBuild: String?
+    /// An update of this installed game stopped part way.
+    var updateStopped: Bool?
+    /// The store has a newer version of this installed game.
     public var updateAvailable: Bool {
-        installed && gogLatestBuild != nil && gogInstalledBuild != nil && gogLatestBuild != gogInstalledBuild
+        installed && latestBuild != nil && installedBuild != nil && latestBuild != installedBuild
     }
+    /// An update of this installed game stopped part way: its files are a mix
+    /// of two versions until Update runs again.
+    public var updateUnfinished: Bool { installed && updateStopped == true }
 
     init(steamAppID: Int, name: String) {
         id = "steam:\(steamAppID)"
@@ -143,8 +148,13 @@ public final class Games {
             var game = byID["steam:\(record.id)"] ?? Game(steamAppID: record.id, name: record.name)
             game.installed = true
             game.partial = nil
-            game.sizeOnDisk = SteamInstallFiles.sizeOnDisk(
-                appID: record.id, steamApps: drive.appendingPathComponent(record.library, isDirectory: true))
+            let steamApps = drive.appendingPathComponent(record.library, isDirectory: true)
+            game.sizeOnDisk = SteamInstallFiles.sizeOnDisk(appID: record.id, steamApps: steamApps)
+            game.installedBuild = Steam.installedBuild(record, steamApps: steamApps)
+            // Chunks left from a stopped run: an update if it was bringing a
+            // newer build (a stopped repair leaves the files as they were).
+            game.updateStopped = game.updateAvailable
+                && DepotDownloader.hasPartialDownload(appID: UInt32(record.id), steamApps: steamApps)
             byID[game.id] = game
         }
         // Folders of downloads that stopped. A folder an installed game uses isn't one.
@@ -176,7 +186,10 @@ public final class Games {
             game.installed = true
             game.partial = nil
             game.sizeOnDisk = record.size
-            game.gogInstalledBuild = record.buildID
+            game.installedBuild = record.buildID
+            // A stopped repair keeps the build; a stopped update doesn't.
+            let unfinished = GOGInstalls.journal(record.productID)?.buildID
+            game.updateStopped = unfinished != nil && unfinished != record.buildID
             byID[game.id] = game
         }
         for id in byID.keys where byID[id]!.source == .gog && !byID[id]!.installed {
@@ -243,6 +256,7 @@ public final class Games {
             game.capsuleImage = app.libraryCapsule
             game.headerImage = app.headerImage
             game.installDir = app.installDir.isEmpty ? nil : app.installDir
+            game.latestBuild = app.buildID > 0 ? String(app.buildID) : nil
             byID[game.id] = game
         }
         reloadInstalled()
@@ -263,7 +277,7 @@ public final class Games {
         // Installed games: whether GOG has a newer build.
         for game in byID.values where game.source == .gog && game.installed {
             if let build = try? await GOGCatalog.builds(game.appID).first {
-                byID[game.id]?.gogLatestBuild = build.build_id
+                byID[game.id]?.latestBuild = build.build_id
             }
         }
         // These don't change (sizes only with an update): ask for missing ones, a few at a time.

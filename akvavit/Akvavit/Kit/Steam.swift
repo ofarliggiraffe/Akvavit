@@ -113,6 +113,15 @@ public final class Steam {
         Set(MadeiraDock.games(drive: MadeiraDock.drive).filter(\.installed).map(\.id))
     }
 
+    /// The build an installed game's record names (Valve's client updates it
+    /// when it updates the game itself).
+    static func installedBuild(_ game: DockGame, steamApps: URL) -> String? {
+        let file = steamApps.appendingPathComponent("appmanifest_\(game.id).acf")
+        guard let data = try? Data(contentsOf: file), var parser = try? SteamKeyValues(data),
+              let build = (try? parser.read())?["AppState"]?["buildid"]?.string, build != "0" else { return nil }
+        return build
+    }
+
     private func refreshInstalled() {
         let installed = installedIDs()
         for index in games.indices { games[index].installed = installed.contains(games[index].id) }
@@ -203,7 +212,10 @@ public final class Steam {
         case .downloading: phase = .downloading
         case .finishing: phase = .finishing
         }
-        return GameDownload(phase: phase, fraction: p.fraction, doneBytes: p.doneBytes,
+        // While checking, how much of the files on disk has been read.
+        let fraction = p.phase == .checking && p.checkTotal > 0
+            ? min(1, Double(p.checkDone) / Double(p.checkTotal)) : p.fraction
+        return GameDownload(phase: phase, fraction: fraction, doneBytes: p.doneBytes,
                             totalBytes: p.totalBytes, bytesPerSecond: p.bytesPerSecond)
     }
 

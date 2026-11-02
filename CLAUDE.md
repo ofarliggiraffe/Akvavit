@@ -197,8 +197,23 @@ Both can be installed side by side. See "Akvavit's own app" below.
     the newest build with the record's. Refused after a session ran this app
     run (Windows may hold the files). Check and repair verified 2026-11-02
     (a deleted file came back); Update **untested** (needs a game with a
-    newer build). Buttons only on the temporary Settings › GOG screen until
-    the user designs their place.
+    newer build).
+- **Update and Check and repair, Steam and GOG** (the user's design,
+  2026-11-02): an update or a check runs in Play's place as a progress bar
+  of Play's height (no speed line under it, so nothing on the card moves),
+  with a cross that stops it. A newer version shows as Update: a separate
+  teal button above Play for GOG (playable without updating; a stopped
+  update shows "Finish update" and blocks Play), in Play's place for Steam
+  (Valve's client would update it at start anyway). Check and repair is the
+  top row of Game settings for every installed game.
+  - Steam: `Game.latestBuild` is the public branch's `buildid` from the
+    owned-apps PICS info; the installed one is `buildid` in
+    `appmanifest_<id>.acf` (`Steam.installedBuild`), which Valve's client
+    also updates. Madeira's `DepotDownloader` run on an installed game
+    reads every file and fetches only chunks that don't match (repair and
+    update in one), but never deletes files a newer build dropped. A
+    stopped Steam update = journals in `downloading/<id>` while an update is
+    available.
   - Store logos (covers, the popup's chip): Wikimedia Commons' public-domain
     Steam and GOG logos, made one-colour, as template images.
 - **App icon** (the user's choice, option C on the icon canvas): `App/AppIcon.icon`

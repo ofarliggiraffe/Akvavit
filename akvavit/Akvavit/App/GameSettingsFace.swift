@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // The popup's underside: the game's settings. Done tips the card back.
+// Installed games get Check and repair at the top.
 
 import AkvavitKit
 import SwiftUI
@@ -37,6 +38,9 @@ struct GameSettingsFace: View {
                     .buttonStyle(.plain)
             }
 
+            if game.installed {
+                RepairRow(game: game)
+            }
             SettingRow("Reduced-precision x87",
                        detail: "Much faster Direct3D 8 games. Off computes floating point exactly, slowly.") {
                 Toggle("Reduced-precision x87", isOn: $store[game.id].reducedPrecisionX87)
@@ -72,11 +76,13 @@ struct GameSettingsFace: View {
 private struct SettingRow<Control: View>: View {
     let title: String
     let detail: String
+    var detailIsProblem = false
     @ViewBuilder let control: Control
 
-    init(_ title: String, detail: String, @ViewBuilder control: () -> Control) {
+    init(_ title: String, detail: String, detailIsProblem: Bool = false, @ViewBuilder control: () -> Control) {
         self.title = title
         self.detail = detail
+        self.detailIsProblem = detailIsProblem
         self.control = control()
     }
 
@@ -87,7 +93,7 @@ private struct SettingRow<Control: View>: View {
                     .font(.quicksand(17, .bold, relativeTo: .body))
                 Text(detail)
                     .font(.quicksand(13, .semibold, relativeTo: .footnote))
-                    .foregroundStyle(Theme.cardSecondaryText)
+                    .foregroundStyle(detailIsProblem ? Theme.destructive : Theme.cardSecondaryText)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             control
@@ -98,16 +104,66 @@ private struct SettingRow<Control: View>: View {
     }
 }
 
+/// Checks every file of the game and fetches the damaged or missing ones
+/// (and brings it to the newest version). Its progress shows in the row,
+/// and on the front above Play.
+private struct RepairRow: View {
+    let game: Game
+
+    var body: some View {
+        let download = Downloads.shared[game.id]
+        let failure: String? = if case .failed(let reason) = download?.phase { reason } else { nil }
+        let running = download != nil && failure == nil
+        SettingRow("Check and repair",
+                   detail: failure ?? "Checks the game's files and downloads any that are damaged or missing.",
+                   detailIsProblem: failure != nil) {
+            if running, let download {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text(Self.status(download))
+                        .monospacedDigit()
+                }
+                .font(.quicksand(15, .bold, relativeTo: .body))
+                .foregroundStyle(Theme.cardSecondaryText)
+                .frame(minHeight: 40)
+            } else {
+                Button {
+                    Downloads.shared.repair(game.id)
+                } label: {
+                    MenuLabel(failure == nil ? "Check" : "Try again", chevron: false)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private static func status(_ download: GameDownload) -> String {
+        switch download.phase {
+        case .waiting: "Waiting"
+        case .checking: "Checking \(Int(download.fraction * 100)) %"
+        case .downloading: "Downloading \(Int(download.fraction * 100)) %"
+        default: "Working"
+        }
+    }
+}
+
 private struct MenuLabel: View {
     let text: String
+    /// A menu's chevron; a plain button has none.
+    var chevron = true
 
-    init(_ text: String) { self.text = text }
+    init(_ text: String, chevron: Bool = true) {
+        self.text = text
+        self.chevron = chevron
+    }
 
     var body: some View {
         HStack(spacing: 8) {
             Text(text)
-            Image(systemName: "chevron.down")
-                .font(.system(size: 13, weight: .bold))
+            if chevron {
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 13, weight: .bold))
+            }
         }
         .font(.quicksand(15, .bold, relativeTo: .body))
         .foregroundStyle(Theme.outlineText)

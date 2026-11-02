@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // TEMPORARY test screen for AkvavitKit's GOG account: sign-in through GOG's
-// own page in a web view, the account, the GOG games in the list, and for
-// installed ones Update and Check and repair (until the game page has them).
+// own page in a web view, the account, and the GOG games in the list.
 
 import AkvavitKit
 import SwiftUI
@@ -26,34 +25,6 @@ struct GOGTestView: View {
                     Button("Sign in to GOG") { showingPage = true }
                     if let error = account.error {
                         Text(error).foregroundStyle(.red)
-                    }
-                }
-            }
-            let installed = games.library.filter { $0.source == .gog }
-            if !installed.isEmpty {
-                Section("Installed") {
-                    ForEach(installed) { game in
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(game.name)
-                            if let download = Downloads.shared[game.id] {
-                                switch download.phase {
-                                case .failed(let why): Text(why).font(.caption).foregroundStyle(.red)
-                                case .checking: Text("Checking files \(Int(download.fraction * 100)) %").font(.caption)
-                                default: ProgressView(value: download.fraction)
-                                }
-                            } else {
-                                Text(game.updateAvailable ? "A newer version is available" : "Up to date, as far as known")
-                                    .font(.caption).foregroundStyle(.secondary)
-                            }
-                            HStack {
-                                Button("Update") { Downloads.shared.install(game.id) }
-                                    .disabled(!game.updateAvailable || busy(game))
-                                Spacer()
-                                Button("Check and repair") { Downloads.shared.repair(game.id) }
-                                    .disabled(busy(game))
-                            }
-                            .buttonStyle(.borderless)
-                        }
                     }
                 }
             }
@@ -87,13 +58,6 @@ struct GOGTestView: View {
             }
         }
     }
-}
-
-/// A download of the game runs or waits (a failed one doesn't count).
-@MainActor private func busy(_ game: Game) -> Bool {
-    guard let download = Downloads.shared[game.id] else { return false }
-    if case .failed = download.phase { return false }
-    return true
 }
 
 /// GOG's sign-in page. It stops at the page GOG ends on and hands over the

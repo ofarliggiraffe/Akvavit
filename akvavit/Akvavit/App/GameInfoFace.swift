@@ -3,7 +3,10 @@
 // The popup's info side: the cover, the title, the facts, Play, and below it
 // Game settings and Uninstall (which asks on the card itself). For a game that
 // isn't installed (Get games): Install, then the download's progress; once
-// installed it turns into the full side.
+// installed it turns into the full side. An update or a check and repair runs
+// in Play's place, as a progress bar. A newer version shows as Update: above
+// Play for GOG (a GOG game can still be played as it is), in Play's place for
+// Steam (Valve's client would update it at start anyway).
 
 import AkvavitKit
 import SwiftUI
@@ -105,32 +108,28 @@ struct GameInfoFace: View {
     private func actions(compact: Bool) -> some View {
         let play = model.play
         let blocked = play.blocked
+        let download = Downloads.shared[game.id]
+        let separateUpdate = game.source == .gog && download == nil && (game.updateAvailable || game.updateUnfinished)
+        let updateInPlace = download != nil || (game.source == .steam && game.updateAvailable)
+        // A game half way between two versions doesn't start.
+        let unfinished = separateUpdate && game.updateUnfinished ? "The update didn't finish. Finish it to play." : nil
+        let held = blocked ?? unfinished
         return VStack(spacing: compact ? 10 : 12) {
-            if let note = play.problem ?? blocked {
+            if separateUpdate {
+                InstallButton(game: game, compact: compact, model: model)
+            }
+            if let note = play.problem ?? held, !updateInPlace {
                 Text(note)
                     .font(.quicksand(compact ? 13 : 14, .semibold, relativeTo: .footnote))
                     .foregroundStyle(Theme.destructive)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Button {
-                Task { await play.play(game) }
-            } label: {
-                if let step = play.step {
-                    HStack(spacing: 10) {
-                        ProgressView().tint(.white)
-                        Text(step)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.6)
-                    }
-                } else {
-                    Label("Play", systemImage: "play.fill")
-                }
+            if updateInPlace {
+                InstallButton(game: game, compact: compact, model: model)
+            } else {
+                playButton(play, held: held, compact: compact)
             }
-            .buttonStyle(FilledButtonStyle(color: Theme.accent, height: compact ? 56 : 58,
-                                           fontSize: compact ? 19 : 20))
-            .disabled(play.busy || blocked != nil)
-            .opacity(blocked != nil ? 0.55 : 1)
             HStack(spacing: compact ? 10 : 12) {
                 Button {
                     model.showSettings()
@@ -146,6 +145,27 @@ struct GameInfoFace: View {
                 .buttonStyle(OutlineButtonStyle(fontSize: compact ? 15 : 16, destructive: true))
             }
         }
+    }
+
+    private func playButton(_ play: PlayStart, held: String?, compact: Bool) -> some View {
+        Button {
+            Task { await play.play(game) }
+        } label: {
+            if let step = play.step {
+                HStack(spacing: 10) {
+                    ProgressView().tint(.white)
+                    Text(step)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                }
+            } else {
+                Label("Play", systemImage: "play.fill")
+            }
+        }
+        .buttonStyle(FilledButtonStyle(color: Theme.accent, height: compact ? 56 : 58,
+                                       fontSize: compact ? 19 : 20))
+        .disabled(play.busy || held != nil)
+        .opacity(held != nil ? 0.55 : 1)
     }
 }
 
@@ -186,7 +206,8 @@ private struct FactsRow: View {
 
 /// Install, then the download's progress in its place, with its speed below
 /// and a button that cancels it; a failed download says why and offers to
-/// try again.
+/// try again. For an installed game the same as Update; stopping an update
+/// deletes nothing (Update goes on from there).
 private struct InstallButton: View {
     let game: Game
     let compact: Bool
@@ -221,12 +242,16 @@ private struct InstallButton: View {
                                     label: Self.label(download), height: height, fontSize: compact ? 17 : 18)
                         cancelButton(height: height)
                     }
-                    Text(Self.detail(download))
-                        .font(.quicksand(13, .semibold, relativeTo: .footnote))
-                        .foregroundStyle(Theme.cardSecondaryText)
-                        .monospacedDigit()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.leading, 4)
+                    // In Play's place (an installed game) the bar keeps Play's
+                    // height, so nothing on the card moves.
+                    if !game.installed {
+                        Text(Self.detail(download))
+                            .font(.quicksand(13, .semibold, relativeTo: .footnote))
+                            .foregroundStyle(Theme.cardSecondaryText)
+                            .monospacedDigit()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.leading, 4)
+                    }
                 }
             }
         } else if game.partiallyDownloaded {
@@ -239,6 +264,13 @@ private struct InstallButton: View {
                 .buttonStyle(FilledButtonStyle(color: teal, height: height, fontSize: fontSize))
                 cancelButton(height: height)
             }
+        } else if game.installed {
+            Button {
+                Downloads.shared.install(game.id)
+            } label: {
+                Label(game.updateUnfinished ? "Finish update" : "Update", systemImage: "arrow.triangle.2.circlepath")
+            }
+            .buttonStyle(FilledButtonStyle(color: teal, height: height, fontSize: fontSize))
         } else {
             Button {
                 Downloads.shared.install(game.id)
@@ -251,7 +283,11 @@ private struct InstallButton: View {
 
     private func cancelButton(height: CGFloat) -> some View {
         Button {
-            model.ask(.cancelDownload)
+            if game.installed {
+                Downloads.shared.cancelDownload(game.id)
+            } else {
+                model.ask(.cancelDownload)
+            }
         } label: {
             Image(systemName: "xmark")
                 .font(.system(size: 18, weight: .bold))
@@ -259,7 +295,7 @@ private struct InstallButton: View {
         }
         .buttonStyle(OutlineButtonStyle(height: height, destructive: true))
         .frame(width: height)
-        .accessibilityLabel("Cancel download")
+        .accessibilityLabel(game.installed ? "Stop" : "Cancel download")
     }
 
     /// Speed and amount, under the bar: "12.3 MB/s · 1.2 of 22 GB".
