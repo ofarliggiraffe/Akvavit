@@ -84,7 +84,9 @@ struct JITSetupView: View {
             if jit.vpnInstalled {
                 Label("VPN allowed", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
             } else {
-                Text("iOS asks once whether Akvavit may add a VPN configuration. It connects only to this \(device), never to the internet.")
+                Text(jit.usesLocalDevVPN
+                     ? "This copy of Akvavit can't run its own VPN (a free Apple ID can't sign it), so JIT goes through LocalDevVPN from the App Store. Get it, allow its VPN when iOS asks, then come back to Akvavit."
+                     : "iOS asks once whether Akvavit may add a VPN configuration. It connects only to this \(device), never to the internet.")
                 Button("Allow the VPN") {
                     vpnError = nil
                     Task {

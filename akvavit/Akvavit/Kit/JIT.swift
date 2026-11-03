@@ -75,6 +75,20 @@ public final class JIT {
 
     /// iOS has the VPN configuration that JIT goes through.
     public var vpnInstalled: Bool { _ = revision; return AkvavitTunnel.shared.installed }
+    /// JIT goes through LocalDevVPN from the App Store, because this copy may not
+    /// run Akvavit's own VPN (no Network Extensions capability: a free Apple ID).
+    /// `installVPN()` then gets it and connects it once.
+    public var usesLocalDevVPN: Bool { AkvavitTunnel.usesLocalDevVPN }
+    public var localDevVPNInstalled: Bool { _ = revision; return AkvavitTunnel.localDevVPNInstalled }
+    /// LocalDevVPN's tunnel is up (with `usesLocalDevVPN`).
+    public var localDevVPNConnected: Bool { _ = revision; return AkvavitTunnel.shared.connected }
+    public func getLocalDevVPN() { AkvavitTunnel.shared.openLocalDevVPNAppStore() }
+    public func connectLocalDevVPN() { AkvavitTunnel.shared.openLocalDevVPN() }
+    /// Reads the VPN's state again (cheap; for a page that waits on it).
+    public func refreshVPN() {
+        AkvavitTunnel.shared.refresh()
+        revision &+= 1
+    }
     public func installVPN() async throws {
         try await withCheckedThrowingContinuation { (done: CheckedContinuation<Void, Error>) in
             AkvavitTunnel.shared.install { error in

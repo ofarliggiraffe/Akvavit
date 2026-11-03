@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Setup, on first start (and from Settings › Run setup again): a card over
-// the blurred home screen whose four steps slide under dots that stay put.
-// Welcome, JIT (pairing, VPN and check run as one chain), Steam, done.
+// the blurred home screen whose steps slide under dots that stay put.
+// Welcome, LocalDevVPN (only when this copy can't run Akvavit's own VPN),
+// JIT (pairing, VPN and check run as one chain), Steam, done.
 
 import AkvavitKit
 import SwiftUI
@@ -17,7 +18,18 @@ struct SetupView: View {
     private static let blue = AppTab.home.colors.tint
     private static let teal = AppTab.getGames.colors.tint
 
-    private var stepColors: [Color] { [Self.blue, Self.teal, Self.blue, Theme.success] }
+    private enum Page { case welcome, localDevVPN, jit, steam, done }
+    private let pages: [Page] = JIT.shared.usesLocalDevVPN
+        ? [.welcome, .localDevVPN, .jit, .steam, .done]
+        : [.welcome, .jit, .steam, .done]
+
+    private func color(_ page: Page) -> Color {
+        switch page {
+        case .welcome, .steam: return Self.blue
+        case .localDevVPN, .jit: return Self.teal
+        case .done: return Theme.success
+        }
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -54,7 +66,7 @@ struct SetupView: View {
                     .transition(.opacity)
             } else {
                 HStack(spacing: 0) {
-                    ForEach(0..<4, id: \.self) { index in
+                    ForEach(pages.indices, id: \.self) { index in
                         page(index, layout: layout)
                             .frame(width: width, height: height)
                             .accessibilityHidden(index != step)
@@ -79,16 +91,16 @@ struct SetupView: View {
 
     private var dots: some View {
         HStack(spacing: 8) {
-            ForEach(0..<4, id: \.self) { index in
+            ForEach(pages.indices, id: \.self) { index in
                 Capsule()
-                    .fill(index == step ? stepColors[step]
+                    .fill(index == step ? color(pages[step])
                           : Theme.cardText.opacity(index < step ? 0.35 : 0.14))
                     .frame(width: index == step ? 22 : 8, height: 8)
             }
         }
         .animation(.easeInOut(duration: 0.3), value: step)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Step \(step + 1) of 4")
+        .accessibilityLabel("Step \(step + 1) of \(pages.count)")
     }
 
     private func go(to next: Int) {
@@ -108,22 +120,25 @@ struct SetupView: View {
 
     @ViewBuilder
     private func page(_ index: Int, layout: SetupLayout) -> some View {
-        switch index {
-        case 0:
+        let next = { go(to: index + 1) }
+        switch pages[index] {
+        case .welcome:
             SetupPage(layout: layout, color: Self.blue, symbol: "sparkles", title: "Welcome to Akvavit",
-                      text: "Akvavit runs Windows games on your iPhone with Madeira’s engine: FEX-Emu, Wine and DXMT, ported to iOS by the Madeira project. Two short steps get you ready.") {
+                      text: "Akvavit runs Windows games on your iPhone with Madeira’s engine: FEX-Emu, Wine and DXMT, ported to iOS by the Madeira project. \(pages.count == 5 ? "Three" : "Two") short steps get you ready.") {
                 EmptyView()
             } primary: {
-                Button("Get started") { go(to: 1) }
+                Button("Get started") { next() }
                     .buttonStyle(FilledButtonStyle(color: Self.blue, height: 56, fontSize: 19))
             } secondary: {
                 EmptyView()
             }
-        case 1:
-            JITStep(layout: layout, color: Self.teal) { go(to: 2) }
-        case 2:
-            SteamSignInStep(layout: layout, color: Self.blue, later: { go(to: 3) }) { go(to: 3) }
-        default:
+        case .localDevVPN:
+            LocalDevVPNStep(layout: layout, color: Self.teal, next: next)
+        case .jit:
+            JITStep(layout: layout, color: Self.teal, next: next)
+        case .steam:
+            SteamSignInStep(layout: layout, color: Self.blue, later: next, next: next)
+        case .done:
             SetupPage(layout: layout, color: Theme.success, symbol: "checkmark", title: "You’re all set",
                       text: "Pick a game in Get games to install it. You can run setup again from Settings.") {
                 EmptyView()
@@ -229,14 +244,14 @@ private struct JITStep: View {
 
     var body: some View {
         SetupPage(layout: layout, color: color, symbol: "bolt.fill", title: "Set up JIT",
-                  text: "Games need JIT. Turn on Wi-Fi and tap Start pairing, then open Settings › Privacy & Security › Developer Mode, tap Pair with \(jit.pairingHostName) and enter the code. Allow the VPN when iOS asks; the rest happens by itself.") {
+                  text: "Games need JIT. Turn on Wi-Fi and tap Start pairing, then open Settings › Privacy & Security › Developer Mode, tap Pair with \(jit.pairingHostName) and enter the code." + (jit.usesLocalDevVPN ? " The rest happens by itself." : " Allow the VPN when iOS asks; the rest happens by itself.")) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .center, spacing: 16) {
                     codeBox
                     VStack(alignment: .leading, spacing: 8) {
-                        row("Paired", done: jit.paired, current: flow.jitProgress == .pairing)
-                        row("VPN allowed", done: jit.vpnInstalled, current: flow.jitProgress == .allowingVPN)
-                        row("JIT ready", done: flow.jitReady, current: flow.jitProgress == .checking)
+                        SetupRow(label: "Paired", done: jit.paired, current: flow.jitProgress == .pairing, color: color)
+                        SetupRow(label: "VPN allowed", done: jit.vpnInstalled, current: flow.jitProgress == .allowingVPN, color: color)
+                        SetupRow(label: "JIT ready", done: flow.jitReady, current: flow.jitProgress == .checking, color: color)
                     }
                 }
                 if let problem {
@@ -311,7 +326,16 @@ private struct JITStep: View {
         .accessibilityElement(children: .combine)
     }
 
-    private func row(_ label: String, done: Bool, current: Bool) -> some View {
+}
+
+/// A step's row: a circle (ticked when done, "…" while it runs) and its label.
+private struct SetupRow: View {
+    let label: String
+    let done: Bool
+    let current: Bool
+    let color: Color
+
+    var body: some View {
         HStack(spacing: 10) {
             ZStack {
                 Circle().fill(done ? Theme.success : current ? color : Theme.cardText.opacity(0.16))
@@ -330,5 +354,64 @@ private struct JITStep: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(label + (done ? ", done" : current ? ", in progress" : ""))
+    }
+}
+
+// MARK: - LocalDevVPN
+
+/// Only when this copy can't run Akvavit's own VPN (no Network Extensions
+/// capability: a free Apple ID): LocalDevVPN from the App Store carries JIT's
+/// connection instead. Get it, connect it once (iOS asks there), continue.
+private struct LocalDevVPNStep: View {
+    let layout: SetupLayout
+    let color: Color
+    let next: () -> Void
+    private let jit = JIT.shared
+    @State private var connecting = false
+
+    var body: some View {
+        SetupPage(layout: layout, color: color, symbol: "network", title: "Get LocalDevVPN",
+                  text: "JIT needs a small VPN that only connects to this iPhone. This copy of Akvavit can’t bring its own, so it uses LocalDevVPN, a free app from the App Store.") {
+            VStack(alignment: .leading, spacing: 8) {
+                SetupRow(label: "Installed", done: jit.localDevVPNInstalled, current: false, color: color)
+                SetupRow(label: "Connected", done: jit.localDevVPNConnected,
+                         current: connecting && !jit.localDevVPNConnected, color: color)
+                if connecting, !jit.localDevVPNConnected {
+                    Text("Allow its VPN when iOS asks, make sure it’s connected, then come back to Akvavit.")
+                        .font(.quicksand(14, .semibold, relativeTo: .footnote))
+                        .foregroundStyle(Theme.cardSecondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 4)
+                }
+            }
+        } primary: {
+            Button(label) { act() }
+                .buttonStyle(FilledButtonStyle(color: color, height: 56, fontSize: 19))
+        } secondary: {
+            EmptyView()
+        }
+        // Installing and connecting happen in other apps: look again while shown.
+        .task {
+            while !Task.isCancelled {
+                jit.refreshVPN()
+                try? await Task.sleep(for: .milliseconds(500))
+            }
+        }
+    }
+
+    private var label: String {
+        if jit.localDevVPNConnected { return "Continue" }
+        return jit.localDevVPNInstalled ? "Connect LocalDevVPN" : "Get LocalDevVPN"
+    }
+
+    private func act() {
+        if jit.localDevVPNConnected {
+            next()
+        } else if jit.localDevVPNInstalled {
+            connecting = true
+            jit.connectLocalDevVPN()
+        } else {
+            jit.getLocalDevVPN()
+        }
     }
 }

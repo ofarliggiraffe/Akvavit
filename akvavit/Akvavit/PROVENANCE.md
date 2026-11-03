@@ -49,11 +49,12 @@ Written for Akvavit. Where a file stands in for something of Madeira's, it says 
 | `App/Info.plist`, `App/Akvavit.entitlements` | The app's keys and capabilities. |
 | `Kit/AkvavitKit.swift` | `AkvavitEngine.start()`. |
 | `Kit/JIT.swift` | AkvavitKit's JIT model. **For now it drives Madeira's JIT code** (`JITCoordinator`, `OnDevicePairing`, `StikJITHelper`); its public API is ours and stays when that code is replaced. |
+| `Kit/JITRouteProbe.swift` | **Temporary experiment** (with `App/Test/JITRouteTestView.swift`): whether the debugger can reach the iPhone's developer services without the VPN. Ours; it calls Madeira's tunnel code (`madeira_rppairing_install_profile`) where it is. |
 | `Kit/Engine/module.modulemap`, `Kit/Engine/MadeiraEngine.h` | Make Madeira's C interface (its bridging header) a module. |
 | `Kit/MadeiraSupport/Shims.swift` | Stand-ins for three things of Madeira's interface code that its compiled-in files refer to (`ExternalDrives`, `OnboardingModel`, `DeviceLoadDiagnostics`). `DeviceLoadDiagnostics.thermalName` names the four thermal states, as Madeira's does. These go when the files that need them are replaced. |
 | `Kit/MadeiraSupport/EngineCallbacks.swift` | `winios_mouse_routing_enabled`, which Madeira's native code calls; the same rule as Madeira's (on unless `env.MADEIRA_MOUSE_ROUTING = 0`). |
 | `scripts/embed-stikjit.sh`, `scripts/sign-bundled-dylibs.sh` | Build phases. They do the same jobs as the inline scripts in Madeira's project (StikJIT into Frameworks; the licence check and dylib signing). |
-| `../App/AkvavitTunnel.swift` | Our JIT VPN (also in Madeira's app). |
+| `../App/AkvavitTunnel.swift` | Our JIT VPN (also in Madeira's app), and our own LocalDevVPN fallback for copies without the Network Extensions capability (written from LocalDevVPN's URL handler; none of Madeira's LocalDevVPN code). |
 | `../App/AkvavitSteamPoll.swift`, `AkvavitSteamRedist.swift`, `AkvavitInstallScripts.swift`, `AkvavitInstallScriptExtras.swift`, `AkvavitSessionLogs.swift`, `AkvavitVCRuntime.swift` | Our earlier additions to Madeira's app, shared. They are written against Madeira's types (`MadeiraDock`, `LogStore`…) and change with them. |
 | `../Tunnel/*` | The tunnel extension (also in Madeira's app). |
 

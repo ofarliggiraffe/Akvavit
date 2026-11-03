@@ -72,16 +72,31 @@
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_remotepairing-pairable-host._tcp</string>
+		<string>_remotepairing._tcp</string>
+		<string>_apple-mobdev2._tcp</string>
 	</array>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER).download.*</string>
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER).pairing.*</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<!-- LocalDevVPN opens akvavit:// to come back after connecting. -->
+				<string>akvavit</string>
+			</array>
+		</dict>
+	</array>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>stikdebug</string>
 		<string>stikjit</string>
+		<string>localdevvpn</string>
 	</array>
 </dict>
 </plist>

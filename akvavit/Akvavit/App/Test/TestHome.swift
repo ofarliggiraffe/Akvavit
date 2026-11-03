@@ -21,6 +21,7 @@ struct TestHome: View {
                     } label: {
                         JITStatusRow()
                     }
+                    NavigationLink("JIT route test") { JITRouteTestView().clearNavigationBackground() }
                     NavigationLink("Steam") { SteamTestView(showingGame: $showingGame).clearNavigationBackground() }
                     NavigationLink("GOG") { GOGTestView().clearNavigationBackground() }
                 }

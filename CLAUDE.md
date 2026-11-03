@@ -735,6 +735,22 @@ through Dock at 60 FPS, RT2, Portal).
   cellular data. LocalDevVPN's tunnel is about 90 lines
   (`NEPacketTunnelProvider` that swaps source and destination IPv4 addresses,
   routing only the peer address).
+- **LocalDevVPN fallback** (2026-11-03, the user's design; for free Apple IDs,
+  which can't have Network Extensions). `AkvavitTunnel.backend` is our own
+  tunnel when the app's signature has the packet-tunnel capability, otherwise
+  LocalDevVPN (App Store, Coxson Engineering; source `jkcoxson/LocalDevVPN`,
+  reviewed 2026-11-03: routes only 10.7.0.1/32, no network calls or tracking).
+  `env.AKVAVIT_OWN_VPN = 0` picks it for testing. Madeira's JIT code keeps
+  calling `AkvavitTunnel` (`start`, `stop`, `connected`) and doesn't notice;
+  Madeira's LocalDevVPN code stays unused.
+  - `localdevvpn://enable?scheme=akvavit` connects it and opens `akvavit://`
+    a second later. The first connect leaves out `scheme`, as iOS asks inside
+    LocalDevVPN then. Its tunnel: `10.7.1.1` (an interface `utun*` with
+    10.7.x = up), peer 10.7.0.1. It connects on demand afterwards.
+  - Setup gets a page "Get LocalDevVPN" (network icon; rows Installed,
+    Connected; one button: Get, Connect, Continue) after Welcome, only then.
+  - Verified on the Duo: setup, JIT (1.8 s), RT2 through Dock. Not yet seen:
+    the hop at a game start while it's disconnected, and setup's Connect.
 - Akvavit's own tunnel (`akvavit/Tunnel`) replaces LocalDevVPN. Verified on
   the Duo (2026-10-30): on Wi-Fi it starts in under 0.2 s and JIT comes on
   about 1.5 s after the tap. On cellular data the tunnel connects but the
@@ -745,6 +761,29 @@ through Dock at 60 FPS, RT2, Portal).
   mode is on. So the rule is: no cellular data in use at the moment JIT
   starts. Hence "Keep the JIT VPN on" (default on, with connect-on-demand):
   JIT works on Wi-Fi, or offline with airplane mode on for a moment.
+- **Why the VPN is needed, and why cellular fails** (measured 2026-11-03 on the
+  Duo, iOS 27.2, with the test screen Settings › JIT route test,
+  `Kit/JITRouteProbe.swift`, tag `[jit-probe]`). StikJIT talks to the
+  remote-pairing service at port 49152 (not lockdownd), which Bonjour
+  advertises as `_remotepairing._tcp`.
+  - Without a VPN: lockdownd (62078) gives "Operation not permitted" at every
+    address (iOS refuses the connect). Remote pairing accepts TCP at the
+    iPhone's own addresses (`127.0.0.1`, `::1`, its Wi-Fi addresses, the VPN's
+    own 10.7.0.2), then hangs up at the first message ("device socket io
+    failed", 10 ms). Through the tunnel (from 10.7.0.1) the whole route works.
+    So it apparently refuses connections from the iPhone itself, and only a VPN
+    can make them come from another address: no JIT without a VPN on a stock
+    iPhone.
+  - On Wi-Fi it listens on loopback, Wi-Fi, `llw0` and the VPN's interface. With
+    Wi-Fi off and cellular data on, only on loopback and `llw0`: 10.7.0.1 gets
+    "refused" (nothing listening). The tunnel letting the packets through is
+    not the problem.
+  - Tried and failed: the tunnel taking all traffic (default routes, IPv4 and
+    IPv6) on cellular. iOS made it the main network, and 10.7.0.1 was still
+    refused. So the service's listening doesn't follow the main network; a
+    guess (unverified) is that it opens up only with Wi-Fi or wired connected.
+    The only way left on cellular is turning cellular data off around JIT
+    start (airplane mode, or a shortcut as in Madeira's `JITNetwork.swift`).
 - Mounting the Developer Disk Image most likely needs Apple's servers once
   after each reboot (unverified).
 - Touch input: in Touch pointer mode, a one-finger drag past 10 pt (or a
