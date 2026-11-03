@@ -495,6 +495,9 @@ through Dock at 60 FPS, RT2, Portal).
   records in the program's memory (the Unix side writes into them), and
   `LPCSTR` is a string, so the generator translates those too; only `HDC`
   and other real handles stay as they are.
+  A pointer argument that is a position in a bound buffer (index, vertex,
+  indirect, pixel and query buffers) must *not* be translated: the
+  generator's `buffer_offset_binding` (see "RT3's ground was missing").
 
   Verified 2026-10-30: RT3 (Steam, through Madeira Dock) runs a campaign at
   60 FPS (with the 16 KB image fix below and reduced-precision x87). Texture glitches
@@ -683,6 +686,35 @@ through Dock at 60 FPS, RT2, Portal).
     overrides; `env.MADEIRA_MFC = 0` leaves them out).
   - Verified 2026-10-31: AoE II HD (Steam, 32-bit, Direct3D 9) starts and
     plays through Dock.
+- **RT3's ground was missing** (2026-11-02, fixed 2026-11-03): the
+  ground and water drew no pixels; the pink was the sky dome's lower half
+  (fog colour) showing through. Cause, in **our** opengl32 fix (see the
+  WoW64 item above): the thunks added the guest window's base to every
+  pointer argument, also to those that are a *position in a bound buffer*
+  (`glDrawElements`' `indices` with an index buffer bound). wined3d
+  suballocates dynamic index buffers from 64 MB GL buffers, so RT3's indices
+  sat at 4 MB and up; with the base added, the GPU read past the buffer's
+  end. Position 0 stayed 0 (`ios_wow_host_ptr` keeps NULL), and vertex
+  arrays survived by luck: Mesa keeps vertex-buffer offsets in 32 bits, and
+  the base (0x71_0000_0000) is a multiple of 4 GB. Index positions are
+  halved first (`>> 1` for 16-bit indices), which brings part of the base
+  back. Fixed in `make_opengl`: `buffer_offset_binding` lists the calls
+  whose pointer can be a buffer position (index, indirect, vertex-array,
+  pixel unpack and pack, query results; 175 thunks and 3 pointer arrays),
+  and their thunks ask GL for the binding (`wow64_buffer_ptr`,
+  `copy_wow64_buffer_ptr32s` in `unix_private.h`): bound, the value passes
+  through; not bound, it is converted as before. Verified on the Duo: RT3's
+  ground and water draw. Texture uploads through pixel buffers had the same
+  fault; after the fix the user found RT3 and RT2 all looking good.
+  How it was found (useful for similar cases): a d3d8 frame dump of every
+  draw with its state, then experiments drawing the same program a second
+  and third time in other thirds of the screen, varying one thing each
+  (no index list, own index list, indices copied to offset 0, copied to the
+  same offset). The diagnostic code is in `.build/rt3-diag/rt3-ground-diag.patch`
+  (git-ignored; `git apply` in `wine/`).
+  Earlier tried: Zink on KosmicKrisp (`madeira.cfg` `gl-vulkan =
+  kosmickrisp`, bundled): the GL start hangs after `zink Vulkan library:
+  libvulkan_kosmickrisp.dylib`, the game never shows.
 - **The Steam version of Railroad Tycoon 3** (app 7610) is packed with Steam's
   copy protection: without a running Steam client it stops with "Failed to
   find Steam". So it needs Madeira Dock (works), or a DRM-free copy.
