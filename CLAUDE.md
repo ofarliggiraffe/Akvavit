@@ -465,6 +465,22 @@ through Dock at 60 FPS, RT2, Portal).
     one-use file (readable by Windows programs in that session, as on a PC).
   `akvavit/App/AkvavitSteamPoll.swift` keeps the sign-in polling alive while the app is in the
   background (approving in the Steam app used to end it).
+- **How others install Akvavit** (the user, 2026-11-03): an unsigned IPA,
+  built (Debug, with the tunnel extension) by our own GitHub Actions workflow
+  on GitHub's free Mac machines (so no personal build paths get in), published
+  on our releases with the prebuilt engine. Our scripts install it on a Mac
+  with Apple's own tools: a throwaway project makes Xcode register the App IDs
+  and fetch the profiles (`xcodebuild -allowProvisioningUpdates`), then the
+  script sets the user's bundle IDs (and the Info.plist entries that depend on
+  them), signs with `codesign` and installs with `devicectl`. A paid account
+  gets everything (own VPN, Extended Virtual Addressing, a year); a free one
+  gets the LocalDevVPN fallback and 7 days (run the script again). Others may
+  sideload the IPA with any tool (it renames bundle IDs: background-task
+  identifiers need to cope). Building from source stays for people who change
+  Akvavit, with the prebuilt engine. Not yet verified: profiles for a free team
+  from the command line, and `devicectl` installing a re-signed app.
+  Plan: `akvavit-ipa-install.md` in the user's plans folder (accepted
+  2026-11-03, steps 0-7; step 0 is a spike that checks those points first).
 - **Credit belongs to Madeira.** Wherever Akvavit has text of its own (setup
   screens, README, about pages), say plainly that this is Madeira by its
   authors, and that Akvavit only packages it for easy installation. Claim
